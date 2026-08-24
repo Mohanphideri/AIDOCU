@@ -1,0 +1,19 @@
+Riverside Community Clinic — Patient Admission and Billing Policy
+
+Admission Process
+The admission process requires the patient to complete registration before the medical evaluation. Patients must bring a valid photo ID and current insurance card to their appointment. Walk-in admissions are accepted between 8 AM and 6 PM on weekdays. Same-day appointments are subject to provider availability and are not guaranteed.
+
+Insurance and Billing
+All billing disputes must be submitted in writing within 60 days of the statement date. Insurance claims are filed automatically on behalf of the patient once a visit is completed. Patients are responsible for any applicable copay at the time of visit. Uninsured patients may qualify for a sliding-scale discount based on household income; documentation is required at intake.
+
+Refund Policy
+Patients may request a refund of an overpayment within 30 days of the billing statement if the amount was paid in error. Refunds are processed within 5 to 7 business days after approval by the billing department. To request a refund, contact patient billing support with the statement number and payment confirmation.
+
+Prescription Policy
+Prescription refills require a minimum of 48 hours notice. Controlled substance refills require an in-person visit and cannot be authorized over the phone. Patients transferring prescriptions from another provider must submit a signed transfer request.
+
+Cancellation Policy
+Appointments cancelled with less than 24 hours notice may be subject to a missed-appointment fee. Repeated no-shows may result in a requirement to prepay for future visits.
+
+Data Privacy
+Riverside Community Clinic does not use any generative AI model to process patient records. All internal document search tools rely on traditional information retrieval techniques such as TF-IDF and BM25 ranking to help staff locate policy information quickly, ensuring the system never fabricates information that is not present in the source policy documents.

@@ -1,0 +1,19 @@
+CloudSuite Terms of Service Summary
+
+Account Registration
+Users must be at least 18 years old to create a CloudSuite account. Account holders are responsible for maintaining the confidentiality of their login credentials. CloudSuite reserves the right to suspend accounts showing evidence of fraudulent activity.
+
+Subscription and Billing
+Subscriptions renew automatically at the end of each billing cycle unless cancelled at least 48 hours before renewal. Annual plans are billed upfront and are non-refundable except where required by local law. Monthly plans may be cancelled at any time, with access continuing through the end of the current billing period.
+
+Refunds
+Customers may request a full refund within 14 days of their first subscription purchase if they have not exceeded the plan's usage limits. Refund requests after the 14-day window are evaluated on a case-by-case basis by the billing team. Refunds are issued to the original payment method within 10 business days of approval.
+
+Data Ownership and Export
+Customers retain full ownership of data uploaded to CloudSuite. Data can be exported at any time in CSV or JSON format from the account settings page. Upon account cancellation, data is retained for 30 days before permanent deletion, giving customers time to export or reactivate.
+
+Service Level Agreement
+CloudSuite commits to 99.9 percent monthly uptime for paid plans. Customers experiencing downtime beyond this threshold may request service credits equal to the affected period, applied to their next billing cycle. Scheduled maintenance windows are excluded from uptime calculations and are announced at least 72 hours in advance.
+
+Termination
+CloudSuite may terminate an account for violation of acceptable use policies, including but not limited to abuse of shared infrastructure, resale of access without authorization, or illegal use of the service. Customers may terminate their own account at any time from account settings.

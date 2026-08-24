@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+* { -webkit-font-smoothing: antialiased; }
+
+body {
+  @apply bg-canvas text-ink dark:bg-dark-canvas dark:text-dark-ink font-body;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { @apply bg-slate-300 dark:bg-dark-border rounded-full; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.focus-ring {
+  @apply outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface dark:focus-visible:ring-offset-dark-surface;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-all hover:bg-primary-hover active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none focus-ring;
+}
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-ink transition-all hover:bg-canvas active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none dark:bg-dark-surface dark:border-dark-border dark:text-dark-ink dark:hover:bg-dark-canvas focus-ring;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-canvas hover:text-ink dark:text-dark-muted dark:hover:bg-dark-canvas dark:hover:text-dark-ink focus-ring;
+}
+.card {
+  @apply rounded-2xl border border-border bg-surface shadow-card dark:bg-dark-surface dark:border-dark-border;
+}
+.input {
+  @apply w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/70 transition-colors focus:border-primary dark:bg-dark-surface dark:border-dark-border dark:text-dark-ink focus-ring;
+}
+
+/* CAPTCHA SVG is generated at 200x70; keep the whole drawing visible. */
+[aria-label="CAPTCHA image"] svg {
+  display: block !important;
+  width: 200px !important;
+  height: 70px !important;
+  max-width: none !important;
+  flex: none !important;
+}

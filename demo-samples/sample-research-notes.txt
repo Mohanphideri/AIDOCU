@@ -1,0 +1,19 @@
+Research Summary: Remote Work Productivity Study
+
+Introduction
+This report summarizes a twelve-month study on remote work productivity across 340 knowledge workers in technology, finance, and healthcare administration roles. The study measured self-reported productivity, manager-rated output quality, and meeting load before and after a shift to hybrid work arrangements.
+
+Key Findings
+Employees working two to three days remotely per week reported an 18 percent increase in self-rated productivity compared to fully in-office employees. Manager-rated output quality remained statistically unchanged between fully remote, hybrid, and fully in-office groups, suggesting that location alone does not predict output quality. Meeting load increased by 22 percent for hybrid employees, largely driven by coordination overhead between in-office and remote participants.
+
+Methodology
+Data was collected through quarterly surveys, calendar analysis, and anonymized productivity software logs. Participants were recruited from eight partner organizations and stratified by role, tenure, and prior remote work experience. All data collection followed informed consent procedures approved by an independent review board.
+
+Recommendations
+Organizations adopting hybrid schedules should invest in asynchronous communication tools to offset the observed increase in meeting load. Managers should be trained to evaluate output quality independent of employee location. Companies should reassess meeting cadence quarterly, since coordination overhead tended to grow over time without active management.
+
+Limitations
+This study did not include manufacturing, retail, or other roles requiring physical presence. Results may not generalize to organizations with fewer than fifty employees. Self-reported productivity measures are subject to recall bias.
+
+Conclusion
+Hybrid work arrangements can improve self-reported productivity without harming output quality, provided organizations actively manage the resulting increase in coordination and meeting overhead.
