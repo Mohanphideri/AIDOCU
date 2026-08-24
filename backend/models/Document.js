@@ -15,7 +15,9 @@ const documentSchema = new Schema(
 
     pageCount: { type: Number, default: 0 },
     extractedText: { type: String, default: '' },
-    language: { type: String, default: 'en' },
+    // Application-level language metadata. This field is deliberately NOT
+    // used by MongoDB's text index as a language override.
+    language: { type: String, enum: ['en', 'unknown'], default: 'unknown' },
 
     processingStatus: {
       type: String,
@@ -36,7 +38,17 @@ const documentSchema = new Schema(
 );
 
 documentSchema.index({ userId: 1, createdAt: -1 });
-documentSchema.index({ userId: 1, name: 'text', extractedText: 'text' });
+// Keep MongoDB text-search language independent from the application
+// `language` field. The special override field is never written, so MongoDB
+// always uses default_language and can never receive `unknown` as a language.
+documentSchema.index(
+  { userId: 1, name: 'text', extractedText: 'text' },
+  {
+    name: 'document_search_text',
+    default_language: 'none',
+    language_override: '__documentSearchLanguage',
+  }
+);
 
 documentSchema.methods.toPublic = function toPublic() {
   return {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  FileSearch, Plus, Search, FileText, Star, Clock, Settings, LogOut,
+  FileSearch, Plus, Search, FileText, Star, Clock, Settings, LogOut, X, Mail,
   PanelLeft, MessageSquare, Trash2, Edit3, MoreHorizontal, HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -11,8 +11,8 @@ function groupByRecency(conversations) {
   const now = new Date();
   const today = [], yesterday = [], week = [], older = [];
   for (const c of conversations) {
-    const d = new Date(c.updatedAt.replace(' ', 'T') + 'Z');
-    const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+    const d = new Date(c.updatedAt);
+    const diffDays = Number.isNaN(d.getTime()) ? 9999 : Math.floor((now - d) / (1000 * 60 * 60 * 24));
     if (diffDays <= 0) today.push(c);
     else if (diffDays === 1) yesterday.push(c);
     else if (diffDays <= 7) week.push(c);
@@ -35,6 +35,7 @@ export default function Sidebar({
   const navigate = useNavigate();
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     const close = () => { setMenuOpenId(null); setProfileMenuOpen(false); };
@@ -126,60 +127,71 @@ export default function Sidebar({
       <div className="border-t border-border dark:border-dark-border p-3 shrink-0">
         <div className="relative">
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); setProfileMenuOpen((o) => !o); }}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-canvas dark:hover:bg-dark-canvas transition-colors ${collapsed ? 'justify-center' : ''}`}
             aria-expanded={profileMenuOpen}
             aria-haspopup="menu"
+            className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2.5 hover:bg-canvas dark:hover:bg-dark-canvas transition-colors ${collapsed ? 'justify-center' : ''}`}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-semibold">
               {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1 text-left">
-                <p className="truncate text-sm font-medium text-ink dark:text-dark-ink">{user?.name}</p>
-                <p className="truncate text-xs text-muted dark:text-dark-muted">{user?.email}</p>
+                <p className="truncate text-sm font-medium text-ink dark:text-dark-ink">{user?.name || 'User'}</p>
+                <p className="truncate text-xs text-muted dark:text-dark-muted">{user?.email || ''}</p>
               </div>
+            )}
+            {!collapsed && (
+              <span className={`text-muted transition-transform duration-150 ${profileMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
+                  <path d="m5 7.5 5 5 5-5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
             )}
           </button>
 
           {profileMenuOpen && (
             <div
-              className="absolute bottom-[calc(100%+8px)] left-0 z-30 w-56 rounded-xl border border-border bg-surface shadow-popover dark:bg-dark-surface dark:border-dark-border p-1.5 animate-fadeIn"
-              onClick={(e) => e.stopPropagation()}
               role="menu"
+              className={`absolute bottom-[calc(100%+8px)] z-30 w-56 rounded-xl border border-border bg-surface shadow-popover dark:bg-dark-surface dark:border-dark-border p-1.5 animate-fadeIn ${collapsed ? 'left-0' : 'left-0 right-0'}`}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="px-2.5 py-2 border-b border-border dark:border-dark-border mb-1.5">
-                <p className="text-sm font-medium text-ink dark:text-dark-ink truncate">{user?.name || 'User'}</p>
+                <p className="text-sm font-semibold text-ink dark:text-dark-ink truncate">{user?.name || 'User'}</p>
                 <p className="text-xs text-muted dark:text-dark-muted truncate">{user?.email || ''}</p>
               </div>
 
               <NavLink
                 to="/app/settings"
-                onClick={() => setProfileMenuOpen(false)}
-                className={({ isActive }) => `flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-ink dark:text-dark-ink hover:bg-canvas dark:hover:bg-dark-canvas ${isActive ? 'bg-primary-light dark:bg-primary/10 text-primary' : ''}`}
                 role="menuitem"
+                onClick={() => setProfileMenuOpen(false)}
+                className={({ isActive }) => `flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-ink dark:text-dark-ink hover:bg-canvas dark:hover:bg-dark-canvas ${isActive ? '!text-primary !bg-primary-light dark:!bg-primary/10' : ''}`}
               >
-                <Settings size={15} /> Settings
+                <Settings size={15} />
+                <span>Settings</span>
               </NavLink>
 
               <button
-                onClick={() => {
-                  setProfileMenuOpen(false);
-                  // Help is currently a UI action; replace the route below if a dedicated help page exists.
-                  navigate('/app/help');
-                }}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-ink dark:text-dark-ink hover:bg-canvas dark:hover:bg-dark-canvas"
+                type="button"
                 role="menuitem"
+                onClick={() => { setProfileMenuOpen(false); setHelpOpen(true); }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-ink dark:text-dark-ink hover:bg-canvas dark:hover:bg-dark-canvas"
               >
-                <HelpCircle size={15} /> Help
+                <HelpCircle size={15} />
+                <span>Help</span>
               </button>
 
+              <div className="my-1.5 border-t border-border dark:border-dark-border" />
+
               <button
-                onClick={() => { setProfileMenuOpen(false); logout(); navigate('/'); }}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-danger hover:bg-danger/5"
+                type="button"
                 role="menuitem"
+                onClick={() => { setProfileMenuOpen(false); logout(); navigate('/'); }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-danger hover:bg-danger/5"
               >
-                <LogOut size={15} /> Logout
+                <LogOut size={15} />
+                <span>Logout</span>
               </button>
             </div>
           )}
@@ -202,6 +214,25 @@ export default function Sidebar({
           <aside className="relative w-[280px] h-full bg-surface dark:bg-dark-surface animate-rise">
             {content}
           </aside>
+        </div>
+      )}
+
+      {helpOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <button type="button" aria-label="Close help" className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={() => setHelpOpen(false)} />
+          <div className="relative w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-popover dark:bg-dark-surface dark:border-dark-border animate-rise">
+            <button type="button" aria-label="Close help" onClick={() => setHelpOpen(false)} className="absolute right-4 top-4 btn-ghost !p-1.5">
+              <X size={17} />
+            </button>
+            <div className="pr-8">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-light text-primary"><HelpCircle size={20} /></div>
+              <h2 className="mt-4 font-display text-xl font-semibold text-ink dark:text-dark-ink">Need help?</h2>
+              <p className="mt-2 text-sm leading-6 text-muted dark:text-dark-muted">For support, questions, or technical assistance, email us and our team will help you.</p>
+              <a href="mailto:docuaisupport@gmail.com" className="mt-5 flex items-center gap-2 rounded-xl border border-border bg-canvas px-4 py-3 text-sm font-semibold text-primary hover:border-primary/40 dark:border-dark-border dark:bg-dark-canvas">
+                <Mail size={16} /> docuaisupport@gmail.com
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </>

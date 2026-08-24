@@ -120,11 +120,11 @@ async function repairConversationIndexes() {
 }
 
 async function repairDocumentTextIndexes() {
-  // Older deployments of DocumentAI may have created a MongoDB text index
-  // with an invalid `language_override: "unknown"`. MongoDB rejects writes
-  // that hit such an index with code 17262. The current schema does not use a
-  // language override, so remove only existing text indexes and recreate the
-  // schema's supported text index.
+  // MongoDB text indexes default to using a field named `language` as their
+  // language override. Older DocumentAI versions stored `unknown` there,
+  // which causes MongoDB error 17262 on writes. Remove every existing text
+  // index and create one with a private override field that the application
+  // never writes. This makes `default_language: 'none'` deterministic.
   const collection = Document.collection;
   if (!collection || !collection.collectionName) return;
 
@@ -132,8 +132,6 @@ async function repairDocumentTextIndexes() {
   try {
     indexes = await collection.listIndexes().toArray();
   } catch (err) {
-    // NamespaceNotFound means this is a fresh database. createIndexes() below
-    // will create the collection and the current schema indexes.
     if (err?.code !== 26) throw err;
   }
 
@@ -142,19 +140,27 @@ async function repairDocumentTextIndexes() {
   );
 
   for (const index of textIndexes) {
-    const name = index.name;
-    if (!name) continue;
-    console.warn(`Removing legacy Document text index: ${name}`);
+    if (!index.name) continue;
+    console.warn(`Removing legacy Document text index: ${index.name}`);
     try {
-      await collection.dropIndex(name);
+      await collection.dropIndex(index.name);
     } catch (err) {
-      // Ignore a race where another process already removed the index.
       if (err?.code !== 27) throw err;
     }
   }
 
-  await Document.createIndexes();
-  console.log('Document text indexes verified.');
+  // Explicitly create the safe index instead of relying on whatever index
+  // options may exist in an older deployed schema.
+  await collection.createIndex(
+    { userId: 1, name: 'text', extractedText: 'text' },
+    {
+      name: 'document_search_text',
+      default_language: 'none',
+      language_override: '__documentSearchLanguage',
+    }
+  );
+
+  console.log('Document text indexes verified (language override disabled).');
 }
 
 const PORT = process.env.PORT || 5000;

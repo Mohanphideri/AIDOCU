@@ -141,7 +141,11 @@ async function processDocument(buffer, fileType, options = {}) {
     throw err;
   }
 
-  const language = detectLanguage(text);
+  // `unknown` is valid application metadata, but it must never be used as
+  // MongoDB's text-index language override. The Document model's text index
+  // uses a private override field that is never populated.
+  const detectedLanguage = detectLanguage(text);
+  const language = detectedLanguage === 'en' ? 'en' : 'unknown';
   const pages = synthesizePages(text, rawPages);
   const chunks = buildChunks(pages);
   // Keyword/key-point extraction is intentionally optional. It is much more
