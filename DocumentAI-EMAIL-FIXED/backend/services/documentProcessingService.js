@@ -82,7 +82,7 @@ async function processDocumentRecord(doc, buffer) {
   }
 }
 
-async function recoverStuckDocuments({ max = 5, ageMs = 2 * 60 * 1000 } = {}) {
+async function recoverStuckDocuments({ max = 20, ageMs = 30 * 1000 } = {}) {
   const cutoff = new Date(Date.now() - ageMs);
   const docs = await Document.find({
     processingStatus: { $in: ['processing', 'pending'] },

@@ -8,6 +8,11 @@ const { requireAuth } = require('../middleware/auth');
 const { renderConversationPdf } = require('../services/pdfService');
 const { routeIntent } = require('../services/intentRouter');
 const { answerDocumentQuestion } = require('../services/documentQueryService');
+const { summarize } = require('../nlp/summarizer');
+const { formatSummary } = require('../nlp/answerFormatter');
+const { buildChunks } = require('../nlp/documentProcessor');
+const { classifyQuestion } = require('../services/questionClassifier');
+const { hybridRetrieve } = require('../services/hybridRetrievalService');
 
 const router = express.Router();
 
@@ -35,7 +40,53 @@ async function runDocumentRetrieval(convo, question) {
     return { answerText: 'This document is still processing. Please wait a moment and try again.', sources };
   }
 
-  const chunks = await DocumentChunk.find({ documentId: doc._id }).sort({ chunkIndex: 1 });
+  let chunks = await DocumentChunk.find({ documentId: doc._id }).sort({ chunkIndex: 1 });
+
+  // Summary prompts are handled as summaries, not as literal keyword
+  // searches for the word "summary". Broad prompts summarize the whole
+  // document; targeted prompts such as "summarise the refund policy" first
+  // retrieve the relevant evidence and then run extractive TextRank on that
+  // evidence. This keeps the answer grounded entirely in the document.
+  const questionType = classifyQuestion(question).type;
+  if (questionType === 'SUMMARY' && doc.extractedText) {
+    const broadSummary = /\b(?:my|this|the)\s+document\b|\bwhat is (?:this|the) document about\b|\bwhole document\b|\boverview\b|\btl;?dr\b|\bkey points?\b/i.test(question);
+    let summaryText = doc.extractedText;
+    let sourceChunks = chunks;
+
+    if (!broadSummary && chunks.length) {
+      const ranked = hybridRetrieve(question, chunks.map((c) => ({
+        text: c.text, page: c.page, section: c.section, chunkType: c.chunkType,
+      })), 'SUMMARY');
+      const relevant = ranked.filter((r) => r.score >= 0.045).slice(0, 6);
+      if (relevant.length) {
+        summaryText = relevant.map((r) => r.chunk.text).join(' ');
+        sourceChunks = relevant.map((r) => r.chunk);
+      }
+    }
+
+    const result = summarize(summaryText, 'medium');
+    return {
+      answerText: formatSummary(result.summary || summaryText.slice(0, 1800), 'medium'),
+      sources: sourceChunks.slice(0, 6).map((c) => ({
+        page: c.page,
+        section: c.section || null,
+        excerpt: c.text.slice(0, 220),
+      })),
+    };
+  }
+
+  // A legacy/stuck document may have extractedText but no chunks. Build a
+  // temporary in-memory fallback so Q&A still works while the document can
+  // be reprocessed in the background.
+  if (!chunks.length && doc.extractedText) {
+    const pages = doc.pages?.length ? doc.pages : [doc.extractedText];
+    const fallbackChunks = buildChunks(pages);
+    chunks = fallbackChunks.map((c, i) => ({
+      ...c,
+      chunkIndex: i,
+    }));
+  }
+
   const result = answerDocumentQuestion(
     question,
     chunks.map((c) => ({ text: c.text, page: c.page, section: c.section, chunkType: c.chunkType }))

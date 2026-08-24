@@ -21,6 +21,7 @@ const { extractTables, lookupInTables } = require('./tableExtractionService');
 const { scoreConfidence, fallbackMessage } = require('./confidenceService');
 const { extractEntities } = require('../nlp/entities');
 const { expandQuery } = require('./queryExpansionService');
+const { formatAnswer } = require('../nlp/answerFormatter');
 
 const RELEVANCE_FLOOR = 0.09;
 const NOT_FOUND = "I couldn't find that information in the uploaded document.";
@@ -41,73 +42,71 @@ function buildSourcesFromChunks(chunks) {
 function pickBestSentence(question, topResults, questionType = classifyQuestion(question).type) {
   const candidateSentences = [];
   for (const r of topResults) {
-    const sentences = splitSentences(r.chunk.text);
-    for (const sentence of sentences) candidateSentences.push({ sentence, chunk: r.chunk, chunkScore: r.score });
+    for (const sentence of splitSentences(r.chunk.text)) {
+      candidateSentences.push({ sentence, chunk: r.chunk, chunkScore: r.score });
+    }
   }
   if (!candidateSentences.length) return null;
 
   const sentTexts = candidateSentences.map((c) => c.sentence);
   const sentTfIdf = buildTfIdf(sentTexts);
   const sentScores = queryTfIdf(question, sentTexts, sentTfIdf);
-  const qKeywords = new Set(tokenizeNoStop(question).map(stem));
   const { originalStems, expandedStems } = expandQuery(question);
-  const expandedKeywords = new Set([...originalStems, ...expandedStems]);
   const literalKeywords = new Set(originalStems);
+  const expandedKeywords = new Set([...originalStems, ...expandedStems]);
 
-  const ranked = candidateSentences
-    .map((c, i) => {
-      const sentenceStems = tokenizeNoStop(c.sentence).map(stem);
-      const literalOverlap = sentenceStems.filter((t) => literalKeywords.has(t)).length;
-      const synonymOverlap = sentenceStems.filter((t) => expandedKeywords.has(t) && !literalKeywords.has(t)).length;
-      // Keep synonym evidence weaker than literal evidence, but allow it to
-      // rescue a valid paraphrase such as "cancel contract" -> "terminate
-      // agreement" at sentence-selection time as well as chunk retrieval.
-      const overlap = literalOverlap + synonymOverlap * 0.5;
-      const sentSim = sentScores[i].score;
-
-      // WHEN questions are especially prone to a bad choice when a chunk
-      // contains two sentences (for example, one sentence states a date and
-      // the next discusses an unrelated result). Give the sentence that
-      // actually contains temporal evidence a small, type-aware boost.
-      let typeBonus = 0;
-      if (questionType === 'WHEN') {
-        const hasDate = /\b(?:19|20)\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(c.sentence);
-        const hasTemporalCue = /\b(?:founded|established|created|started|launched|signed|approved|occurred|happened|began|ended|effective|dated|year|date|day)\b/i.test(c.sentence);
-        const entities = extractEntities(c.sentence);
-        const hasEntityDate = entities.dates && entities.dates.length > 0;
-        if (hasDate || hasEntityDate) typeBonus += 0.10;
-        if (hasTemporalCue) typeBonus += 0.05;
-      }
-
-      return {
-        ...c,
-        overlap,
-        literalOverlap,
-        synonymOverlap,
-        sentSim,
-        typeBonus,
-        score: sentSim * 0.62 + c.chunkScore * 0.18 + Math.min(1, overlap / 4) * 0.15 + typeBonus
-      };
-    })
-    .sort((a, b) => b.score - a.score);
+  const ranked = candidateSentences.map((c, i) => {
+    const sentenceStems = tokenizeNoStop(c.sentence).map(stem);
+    const literalOverlap = sentenceStems.filter((t) => literalKeywords.has(t)).length;
+    const synonymOverlap = sentenceStems.filter((t) => expandedKeywords.has(t) && !literalKeywords.has(t)).length;
+    const sentSim = sentScores[i].score;
+    let typeBonus = 0;
+    if (questionType === 'WHEN' || questionType === 'DATE') {
+      const hasDate = /\b(?:19|20)\d{2}\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(c.sentence);
+      const hasTemporalCue = /\b(?:founded|established|created|started|launched|signed|approved|occurred|happened|began|ended|effective|dated|year|date|day)\b/i.test(c.sentence);
+      const entities = extractEntities(c.sentence);
+      if (hasDate || (entities.dates && entities.dates.length)) typeBonus += 0.10;
+      if (hasTemporalCue) typeBonus += 0.05;
+    }
+    return {
+      ...c,
+      literalOverlap,
+      synonymOverlap,
+      sentSim,
+      score: sentSim * 0.58 + c.chunkScore * 0.22 + Math.min(1, (literalOverlap + synonymOverlap * 0.5) / 4) * 0.15 + typeBonus,
+    };
+  }).sort((a, b) => b.score - a.score);
 
   const best = ranked[0];
-  if (!best || best.score <= 0 ||
-      (best.sentSim < 0.1 && best.literalOverlap < 2 && best.synonymOverlap < 1)) return null;
+  if (!best || best.score <= 0 || (best.sentSim < 0.055 && best.literalOverlap < 1 && best.synonymOverlap < 1)) return null;
 
-  const chunkSentences = splitSentences(best.chunk.text);
-  const bestIdx = chunkSentences.indexOf(best.sentence);
-  // For temporal/date questions, return only the winning sentence. A
-  // two-sentence chunk often contains a correct date statement followed by
-  // an unrelated event; adding the neighbour would make a correct sentence
-  // picker look like it selected the wrong evidence.
-  const contextSentences = (questionType === 'WHEN' || questionType === 'DATE')
-    ? [best.sentence]
-    : chunkSentences.slice(Math.max(0, bestIdx), Math.min(chunkSentences.length, bestIdx + 2));
+  // Assemble several high-quality evidence sentences. This handles answers
+  // spread across a definition, condition and exception instead of returning
+  // only the first matching sentence.
+  const maxSentences = ['WHY', 'HOW', 'WHAT', 'WHICH', 'DEFINITION'].includes(questionType) ? 4 : 3;
+  const selected = [];
+  const seen = new Set();
+  for (const item of ranked) {
+    if (selected.length >= maxSentences) break;
+    const normalized = item.sentence.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (seen.has(normalized)) continue;
+    const relevant = item === best || item.literalOverlap > 0 || item.synonymOverlap > 0 || item.sentSim >= 0.18;
+    if (!relevant) continue;
+    selected.push(item);
+    seen.add(normalized);
+  }
 
-  return { text: contextSentences.join(' '), best, contextSentences };
+  // Precision matters more for yes/no and date questions.
+  if (questionType === 'WHEN' || questionType === 'DATE' || questionType === 'YES_NO') selected.splice(1);
+  if (!selected.length) selected.push(best);
+
+  return {
+    text: selected.map((x) => x.sentence).join(' '),
+    best,
+    contextSentences: selected.map((x) => x.sentence),
+    sourceChunks: [...new Set(selected.map((x) => x.chunk))],
+  };
 }
-
 /** Splits a single sentence like "Benefits include: health insurance,
  * paid time off, and remote work." into discrete comma-separated items,
  * when it reads as an inline enumeration. Returns null if it doesn't. */
@@ -188,7 +187,7 @@ function answerSingle(question, chunks, questionTypeOverride) {
   const tableHit = tryTableLookup(question, chunks);
   if (tableHit && tableHit.score >= 3) {
     return {
-      answer: `${tableHit.rowLabel} — ${tableHit.column}: ${tableHit.value}.`,
+      answer: formatAnswer(`${tableHit.rowLabel} — ${tableHit.column}: ${tableHit.value}.`, questionType),
       confidence: 'HIGH',
       sources: [{ page: tableHit.page, section: tableHit.section || null, excerpt: tableHit.headers.join(' | ') }],
       type: questionType,
@@ -196,7 +195,7 @@ function answerSingle(question, chunks, questionTypeOverride) {
   }
 
   const ranked = hybridRetrieve(question, chunks, questionType);
-  const topResults = ranked.slice(0, 3).filter((r) => r.score > 0);
+  const topResults = ranked.slice(0, 8).filter((r) => r.score > 0);
   if (!topResults.length || topResults[0].score < RELEVANCE_FLOOR) {
     return { answer: NOT_FOUND, confidence: 'LOW', sources: [], type: questionType, matched: false };
   }
@@ -208,14 +207,14 @@ function answerSingle(question, chunks, questionTypeOverride) {
       const fallback = pickBestSentence(question, topResults, questionType);
       if (!fallback) return { answer: NOT_FOUND, confidence: 'LOW', sources: [], type: questionType, matched: false };
       return {
-        answer: fallback.text,
+        answer: formatAnswer(fallback.text, questionType),
         confidence: conf.level,
         sources: buildSourcesFromChunks(topResults.map((r) => r.chunk)),
         type: questionType,
       };
     }
     return {
-      answer: items.map((it, i) => `${i + 1}. ${it}`).join('\n'),
+      answer: formatAnswer(items.map((it, i) => `${i + 1}. ${it}`).join('\n'), questionType),
       confidence: conf.level,
       sources: buildSourcesFromChunks(topResults.map((r) => r.chunk)),
       type: questionType,
@@ -241,9 +240,9 @@ function answerSingle(question, chunks, questionTypeOverride) {
   }
 
   return {
-    answer: picked.text,
+    answer: formatAnswer(picked.text, questionType),
     confidence: conf.level,
-    sources: buildSourcesFromChunks(topResults.map((r) => r.chunk)),
+    sources: buildSourcesFromChunks(picked.sourceChunks || topResults.map((r) => r.chunk)),
     type: questionType,
   };
 }
@@ -284,7 +283,7 @@ function answerComparison(question, chunks) {
   const sources = [...(notFoundA ? [] : resultA.sources), ...(notFoundB ? [] : resultB.sources)];
   const confLevel = notFoundA || notFoundB ? 'MEDIUM' : 'HIGH';
 
-  return { answer: lines.join('\n'), confidence: confLevel, sources, type: 'COMPARE' };
+  return { answer: formatAnswer(lines.join('\n'), 'COMPARE'), confidence: confLevel, sources, type: 'COMPARE' };
 }
 
 function answerMultiPart(question, chunks, parts) {
@@ -304,7 +303,7 @@ function answerMultiPart(question, chunks, parts) {
   const sources = results.flatMap(({ result }) => (result && result.sources ? result.sources : []));
   const anyLow = results.some((r) => !r.result || r.result.confidence === 'LOW');
 
-  return { answer: lines.join('\n'), confidence: anyLow ? 'MEDIUM' : 'HIGH', sources, type: 'MULTI_PART' };
+  return { answer: formatAnswer(lines.join('\n'), 'MULTI_PART'), confidence: anyLow ? 'MEDIUM' : 'HIGH', sources, type: 'MULTI_PART' };
 }
 
 /**

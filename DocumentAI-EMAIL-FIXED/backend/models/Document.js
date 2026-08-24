@@ -38,18 +38,6 @@ const documentSchema = new Schema(
 );
 
 documentSchema.index({ userId: 1, createdAt: -1 });
-// Keep MongoDB text-search language independent from the application
-// `language` field. The special override field is never written, so MongoDB
-// always uses default_language and can never receive `unknown` as a language.
-documentSchema.index(
-  { userId: 1, name: 'text', extractedText: 'text' },
-  {
-    name: 'document_search_text',
-    default_language: 'none',
-    language_override: '__documentSearchLanguage',
-  }
-);
-
 documentSchema.methods.toPublic = function toPublic() {
   return {
     id: this._id.toString(),

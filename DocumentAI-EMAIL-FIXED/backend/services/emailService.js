@@ -2,9 +2,32 @@ const https = require('https');
 
 function isConfigured() {
   return Boolean(
-    process.env.BREVO_API_KEY &&
-    process.env.MAIL_FROM_EMAIL
+    String(process.env.BREVO_API_KEY || '').trim() &&
+    String(process.env.MAIL_FROM_EMAIL || '').trim()
   );
+}
+
+function getFrontendUrl() {
+  const value = String(process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+function emailConfiguration() {
+  return {
+    configured: isConfigured(),
+    provider: 'brevo-api',
+    senderEmail: process.env.MAIL_FROM_EMAIL || null,
+    senderName: process.env.MAIL_FROM_NAME || 'DocumentAI',
+    frontendUrl: getFrontendUrl() || null,
+    frontendUrlConfigured: Boolean(getFrontendUrl()),
+  };
 }
 
 function brevoRequest(payload) {
@@ -33,7 +56,7 @@ function brevoRequest(payload) {
           return resolve(parsed || {});
         }
 
-        const message = parsed?.message || responseBody || `Brevo API returned HTTP ${res.statusCode}`;
+        const message = parsed?.message || parsed?.code || responseBody || `Brevo API returned HTTP ${res.statusCode}`;
         const error = new Error(message);
         error.statusCode = res.statusCode;
         reject(error);
@@ -61,6 +84,9 @@ function escapeHtml(value = '') {
 async function sendPasswordResetEmail({ to, name, resetUrl, expiresMinutes }) {
   if (!isConfigured()) {
     throw new Error('Brevo API email configuration is incomplete. Set BREVO_API_KEY and MAIL_FROM_EMAIL.');
+  }
+  if (!resetUrl || !/^https?:\/\//i.test(String(resetUrl))) {
+    throw new Error('Password reset URL is not configured correctly. Set FRONTEND_URL to the deployed frontend URL.');
   }
 
   const fromName = process.env.MAIL_FROM_NAME || 'DocumentAI';
@@ -116,6 +142,7 @@ async function sendPasswordResetEmail({ to, name, resetUrl, expiresMinutes }) {
     subject,
     textContent: text,
     htmlContent: html,
+    ...(process.env.MAIL_REPLY_TO_EMAIL ? { replyTo: { email: process.env.MAIL_REPLY_TO_EMAIL, name: process.env.MAIL_REPLY_TO_NAME || fromName } } : {}),
   });
 }
 
@@ -161,7 +188,8 @@ async function sendRegistrationOtpEmail({ to, name, otp, expiresMinutes = 10 }) 
     subject,
     textContent: text,
     htmlContent: html,
+    ...(process.env.MAIL_REPLY_TO_EMAIL ? { replyTo: { email: process.env.MAIL_REPLY_TO_EMAIL, name: process.env.MAIL_REPLY_TO_NAME || fromName } } : {}),
   });
 }
 
-module.exports = { sendPasswordResetEmail, sendRegistrationOtpEmail, isConfigured };
+module.exports = { sendPasswordResetEmail, sendRegistrationOtpEmail, isConfigured, emailConfiguration };

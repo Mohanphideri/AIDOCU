@@ -42,12 +42,15 @@ function classifyQuestion(rawQuestion) {
     return { type: 'COMPARE' };
   }
 
-  if (/^(is|are|does|do|did|was|were|can|could|will|would|has|have)\b/i.test(lower)) {
-    return { type: 'YES_NO' };
+  // Summary detection MUST run before YES_NO.
+  // Phrases such as "can you summarise this?" begin with "can" but are
+  // summary requests, not yes/no questions.
+  if (/\bsummar(y|ize|ise)\b|\bkey points?\b|\boverview\b|\btl;?dr\b|\babout (?:my|this|the) document\b|\btell me about (?:my|this|the) document\b|\bwhat is this document about\b|\bgive me (?:a )?(?:brief )?(?:summary|overview)\b/i.test(lower)) {
+    return { type: 'SUMMARY' };
   }
 
-  if (/\bsummar(y|ize|ise)\b|\bkey points?\b|\boverview\b|\btl;?dr\b/i.test(lower)) {
-    return { type: 'SUMMARY' };
+  if (/^(is|are|does|do|did|was|were|can|could|will|would|has|have)\b/i.test(lower)) {
+    return { type: 'YES_NO' };
   }
 
   if (/\bwhat\s+is\s+the\s+(price|cost|fee|warranty|value)\s+of\b|\bhow\s+much\s+(is|does|for)\b.*\b(product|item|plan)\b/i.test(lower)) {

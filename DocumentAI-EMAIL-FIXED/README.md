@@ -315,3 +315,80 @@ PASSWORD_RESET_EXPIRE_MINUTES=30
 The reset flow is: `/forgot-password` → Brevo email → `/reset-password/:token`. Reset tokens are cryptographically random, stored only as SHA-256 hashes, expire after the configured period, are single-use, and password reset increments the user's JWT token version to invalidate previous sessions.
 
 Never commit real Brevo credentials to source control.
+
+
+## Latest processing fix
+- Removed the MongoDB text index from `Document`; DocumentAI uses BM25/TF-IDF retrieval, so the MongoDB text index was unnecessary.
+- Startup now removes legacy MongoDB text indexes without recreating them, eliminating `language override unsupported: unknown` (MongoDB 17262).
+- Summary prompts such as `summarise`, `summarize`, `overview`, and `about my document` now use the document's extracted text directly.
+- Q&A has an in-memory chunk fallback for documents that have extracted text but missing chunk records.
+- Added `POST /api/documents/:id/reprocess` to retry a failed/stuck document from its Cloudinary copy.
+- Recovery now picks up stale processing jobs sooner and up to 20 jobs per startup.
+
+## Document-grounded answer behavior
+
+The document Q&A pipeline is intentionally grounded in extracted document text. It now:
+- recognizes broad summary prompts before yes/no classification;
+- summarizes the whole document for prompts such as `summarise this document` and `what is this document about`;
+- summarizes a relevant section for targeted prompts such as `summarise the refund policy`;
+- retrieves a wider evidence window for questions whose answers span multiple paragraphs;
+- combines multiple relevant evidence sentences for `what`, `why`, `how`, `which`, and definition questions;
+- expands common natural-language phrasing such as `get my money back` -> `refund` and `end my subscription` -> `cancel subscription`;
+- keeps all answers extractive and source-grounded, so it does not invent facts that are not present in the document.
+
+This backend does not use an LLM. Therefore, answers are source-grounded/extractive rather than free-form generated prose. A true generative answer composer can be added later behind an optional LLM provider if desired.
+
+## Enhanced document understanding
+
+This build adds a larger deterministic semantic-language layer on top of BM25/TF-IDF. It recognizes common paraphrases and related concepts such as:
+- refund / reimbursement / getting money back
+- cancel / terminate / end a subscription or contract
+- price / cost / fee / amount
+- duration / how long / timeframe
+- requirements / eligibility / prerequisites
+- support / help / contact information
+- purpose / objective / goal
+- definition / meaning / what a term refers to
+- responsibility / owner / manager
+- dates / deadlines / effective dates
+- comparisons, benefits, policies, permissions, restrictions, delivery, warranty, and more
+
+It also adds fuzzy token matching for small spelling/morphology differences and improves extractive summaries by selecting diverse, high-information sentences in document order.
+
+This is still a deterministic NLP system (BM25 + TF-IDF + TextRank + controlled semantic expansion), not a trained neural LLM. For fully fluent generative answers, an LLM/RAG provider would be an additional optional layer.
+
+## Enhanced answer quality
+
+The Q&A layer now uses controlled concept expansion, fuzzy retrieval, multi-chunk evidence selection, and a deterministic presentation layer. Answers remain grounded in extracted document text, while the chat UI renders headings, paragraphs, bullets, and numbered lists with consistent spacing.
+
+This is not a generative LLM. To make the system genuinely generative while preserving document grounding, connect an LLM after retrieval and pass only the top evidence chunks to it.
+
+
+## Production email configuration (Brevo API)
+
+DocumentAI sends registration OTPs and password-reset emails through the Brevo Transactional Email API. No SMTP mailbox connection is required.
+
+Backend Render environment variables:
+
+```env
+BREVO_API_KEY=xkeysib-...
+MAIL_FROM_EMAIL=your-verified-sender@example.com
+MAIL_FROM_NAME=DocumentAI
+MAIL_REPLY_TO_EMAIL=docuaisupport@gmail.com
+MAIL_REPLY_TO_NAME=DocumentAI Support
+FRONTEND_URL=https://your-frontend-domain
+REGISTRATION_OTP_EXPIRE_MINUTES=10
+PASSWORD_RESET_EXPIRE_MINUTES=30
+```
+
+`MAIL_FROM_EMAIL` must be a sender/domain verified in Brevo. `FRONTEND_URL` must be the deployed frontend URL, not `localhost`, otherwise password-reset links will point to the developer's computer.
+
+Safe diagnostics are available at:
+
+`GET /api/auth/email-status`
+
+This endpoint reports whether the Brevo configuration is present without exposing the API key.
+
+## Document processing and Q&A
+
+Uploads are stored in Cloudinary first and processed in the background. Extracted text and searchable chunks are persisted before optional keywords/key-points work. Document Q&A uses the application's BM25/TF-IDF retrieval and query expansion and formats answers with headings, paragraphs, bullets and numbered lists. MongoDB text indexes are disabled for document search so document language metadata such as `unknown` cannot trigger MongoDB error 17262.

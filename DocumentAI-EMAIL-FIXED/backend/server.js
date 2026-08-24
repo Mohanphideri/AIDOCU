@@ -120,11 +120,13 @@ async function repairConversationIndexes() {
 }
 
 async function repairDocumentTextIndexes() {
-  // MongoDB text indexes default to using a field named `language` as their
-  // language override. Older DocumentAI versions stored `unknown` there,
-  // which causes MongoDB error 17262 on writes. Remove every existing text
-  // index and create one with a private override field that the application
-  // never writes. This makes `default_language: 'none'` deterministic.
+  // DocumentAI uses its own BM25/TF-IDF retrieval, so MongoDB's text index
+  // is not required for document Q&A. Older deployments created a MongoDB
+  // text index that treated the Document.language field as a language
+  // override; values such as "unknown" then caused MongoDB error 17262.
+  //
+  // Remove any legacy text indexes and do NOT recreate one. This completely
+  // removes MongoDB language-override processing from document writes.
   const collection = Document.collection;
   if (!collection || !collection.collectionName) return;
 
@@ -149,18 +151,7 @@ async function repairDocumentTextIndexes() {
     }
   }
 
-  // Explicitly create the safe index instead of relying on whatever index
-  // options may exist in an older deployed schema.
-  await collection.createIndex(
-    { userId: 1, name: 'text', extractedText: 'text' },
-    {
-      name: 'document_search_text',
-      default_language: 'none',
-      language_override: '__documentSearchLanguage',
-    }
-  );
-
-  console.log('Document text indexes verified (language override disabled).');
+  console.log('Document text indexes disabled; application BM25/TF-IDF retrieval is active.');
 }
 
 const PORT = process.env.PORT || 5000;

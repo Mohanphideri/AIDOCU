@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuid } = require('uuid');
 const crypto = require('crypto');
-const { sendPasswordResetEmail, sendRegistrationOtpEmail, isConfigured: isEmailConfigured } = require('../services/emailService');
+const { sendPasswordResetEmail, sendRegistrationOtpEmail, isConfigured: isEmailConfigured, emailConfiguration } = require('../services/emailService');
 const User = require('../models/User');
 const RegistrationOtp = require('../models/RegistrationOtp');
 const { requireAuth } = require('../middleware/auth');
@@ -13,6 +13,18 @@ const { generateCaptcha, invalidateCaptcha } = require('../services/captchaServi
 const { OAuth2Client } = require('google-auth-library');
 
 const router = express.Router();
+
+// Safe diagnostics: exposes configuration status only, never API credentials.
+router.get('/email-status', (req, res) => {
+  const config = emailConfiguration();
+  res.json({
+    ...config,
+    resetUrlReady: Boolean(process.env.FRONTEND_URL),
+    message: config.configured
+      ? 'Brevo API email configuration is present.'
+      : 'Brevo API email configuration is incomplete.'
+  });
+});
 
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
@@ -104,7 +116,7 @@ router.post('/register', authLimiter, verifyCaptcha, async (req, res) => {
       await sendRegistrationOtpEmail({ to: normalizedEmail, name: name.trim(), otp, expiresMinutes });
     } catch (mailErr) {
       await RegistrationOtp.deleteOne({ email: normalizedEmail }).catch(() => {});
-      console.error('[Registration verification] Brevo API delivery failed:', mailErr.message);
+      console.error('[Registration verification] Brevo API delivery failed:', { message: mailErr.message, statusCode: mailErr.statusCode, sender: process.env.MAIL_FROM_EMAIL });
       return res.status(502).json({ error: 'We could not send the verification email. Please try again later.' });
     }
 
@@ -181,7 +193,7 @@ router.post('/resend-registration-otp', authLimiter, async (req, res) => {
     try {
       await sendRegistrationOtpEmail({ to: pending.email, name: pending.name, otp, expiresMinutes });
     } catch (mailErr) {
-      console.error('[Registration verification] Resend failed:', mailErr.message);
+      console.error('[Registration verification] Resend failed:', { message: mailErr.message, statusCode: mailErr.statusCode, sender: process.env.MAIL_FROM_EMAIL });
       return res.status(502).json({ error: 'We could not send the verification email. Please try again later.' });
     }
     return res.json({ success: true, message: 'A new verification code has been sent.' });
@@ -310,7 +322,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
       user.passwordResetTokenHash = null;
       user.passwordResetExpiresAt = null;
       await user.save().catch(() => {});
-      console.error('[Password reset] Brevo API delivery failed:', mailErr.message);
+      console.error('[Password reset] Brevo API delivery failed:', { message: mailErr.message, statusCode: mailErr.statusCode, sender: process.env.MAIL_FROM_EMAIL });
       return res.status(502).json({ error: 'We could not send the password reset email. Please try again later.' });
     }
 

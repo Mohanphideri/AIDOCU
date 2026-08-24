@@ -17,15 +17,16 @@ const { extractEntities } = require('../nlp/entities');
 const { expandQuery } = require('./queryExpansionService');
 
 const WEIGHTS = {
-  bm25: 0.26,
-  tfidf: 0.20,
-  expandedRetrieval: 0.08,
-  phrase: 0.13,
-  keyword: 0.11,
-  section: 0.06,
+  bm25: 0.24,
+  tfidf: 0.18,
+  expandedRetrieval: 0.12,
+  phrase: 0.11,
+  keyword: 0.12,
+  section: 0.05,
   entity: 0.07,
   questionType: 0.07,
-  table: 0.02,
+  fuzzyKeyword: 0.05,
+  table: 0.03,
 };
 
 // Which entity buckets matter for a given question type — used to
@@ -64,6 +65,37 @@ function keywordOverlapScore(qStems, chunkStems) {
   const chunkSet = new Set(chunkStems);
   const hits = qStems.filter((t) => chunkSet.has(t)).length;
   return hits / qStems.length;
+}
+
+
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (!a) return b.length;
+  if (!b) return a.length;
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = cur[j];
+  }
+  return prev[b.length];
+}
+
+function fuzzyKeywordScore(qStems, chunkStems) {
+  if (!qStems.length || !chunkStems.length) return 0;
+  let hits = 0;
+  for (const q of qStems) {
+    if (chunkStems.includes(q)) { hits += 1; continue; }
+    let matched = false;
+    for (const c of chunkStems) {
+      const maxLen = Math.max(q.length, c.length);
+      if (maxLen >= 5 && editDistance(q, c) <= (maxLen >= 8 ? 2 : 1)) { matched = true; break; }
+    }
+    if (matched) hits += 0.65;
+  }
+  return Math.min(1, hits / qStems.length);
 }
 
 function sectionRelevanceScore(qStems, section) {
@@ -110,7 +142,22 @@ function hybridRetrieve(question, chunks, questionType = 'WHAT') {
   // query. This is an auxiliary recall signal: a synonym match can lift a
   // genuinely relevant chunk above the floor, but the literal query keeps
   // the stronger weight so expansion cannot dominate direct evidence.
-  const { originalStems, expandedStems, expandedQueryText } = expandQuery(question);
+  // Normalize common natural-language phrases before synonym expansion.
+  // This improves questions such as "how do I get my money back?" when the
+  // document uses the term "refund", without introducing a generative model.
+  const normalizedQuestion = String(question || '')
+    .replace(/\bget (?:my|your|the) money back\b/gi, 'refund')
+    .replace(/\bpay (?:my|the) money back\b/gi, 'refund')
+    .replace(/\bgive (?:me|us) (?:a )?refund\b/gi, 'refund')
+    .replace(/\bend (?:my|the) subscription\b/gi, 'cancel subscription')
+    .replace(/\bstop (?:my|the) subscription\b/gi, 'cancel subscription')
+    .replace(/\bhow long does it take\b/gi, 'processing duration')
+    .replace(/\bhow much time\b/gi, 'duration time')
+    .replace(/\bproof of purchase\b/gi, 'purchase receipt')
+    .replace(/\bmust i\b/gi, 'do i need')
+    .replace(/\bdo i have to\b/gi, 'requirement');
+
+  const { originalStems, expandedStems, expandedQueryText } = expandQuery(normalizedQuestion);
   const expandedBm25 = queryBm25(expandedQueryText, bm25Index).map((s) => s.score);
   const expandedBm25Norm = normalizeArray(expandedBm25);
   const expandedTfIdf = queryTfIdf(expandedQueryText, chunkTexts, tfidfIndex)
@@ -135,7 +182,7 @@ function hybridRetrieve(question, chunks, questionType = 'WHAT') {
     const keywordScore = Math.max(keyword, keywordExpanded * 0.6);
     const expandedRetrieval = Math.max(expandedBm25Norm[i], expandedTfIdf[i]);
 
-    const phrase = phraseMatchScore(question, chunk.text);
+    const phrase = phraseMatchScore(normalizedQuestion, chunk.text);
     const section = sectionRelevanceScore(allQStems, chunk.section);
     const entity = entityRelevanceScore(questionType, chunk.text);
     const table = chunk.chunkType === 'table' && questionType === 'TABLE_LOOKUP' ? 1 : 0;
@@ -147,6 +194,7 @@ function hybridRetrieve(question, chunks, questionType = 'WHAT') {
       expandedRetrieval * WEIGHTS.expandedRetrieval +
       phrase * WEIGHTS.phrase +
       keywordScore * WEIGHTS.keyword +
+      fuzzyKeyword * WEIGHTS.fuzzyKeyword +
       section * WEIGHTS.section +
       entity * WEIGHTS.entity +
       questionTypeScore * WEIGHTS.questionType +
@@ -156,7 +204,7 @@ function hybridRetrieve(question, chunks, questionType = 'WHAT') {
       index: i,
       chunk,
       score: finalScore,
-      signals: { bm25: bm25Norm[i], tfidf: tfidfScores[i], expandedRetrieval, phrase, keyword: keywordScore, section, entity, questionType: questionTypeScore, table },
+      signals: { bm25: bm25Norm[i], tfidf: tfidfScores[i], expandedRetrieval, phrase, keyword: keywordScore, fuzzyKeyword, section, entity, questionType: questionTypeScore, table },
     };
   });
 

@@ -33,7 +33,8 @@ function summarize(text, length = 'medium') {
   // in extractive summarization (lead bias), applied gently.
   const combined = sentences.map((_, i) => {
     const posBoost = 1 / Math.sqrt(i + 1.4);
-    return rankScores[i] * 0.6 + tfidfScores[i] * 0.3 + posBoost * 0.1;
+    const lengthBoost = Math.min(1, sentences[i].split(/\s+/).length / 18);
+    return rankScores[i] * 0.52 + tfidfScores[i] * 0.28 + posBoost * 0.12 + lengthBoost * 0.08;
   });
 
   const ratio = LENGTH_RATIOS[length] ?? LENGTH_RATIOS.medium;
@@ -41,11 +42,31 @@ function summarize(text, length = 'medium') {
   const max = LENGTH_MAX[length] ?? LENGTH_MAX.medium;
   const targetCount = Math.min(max, Math.max(min, Math.round(sentences.length * ratio)), sentences.length);
 
-  const ranked = combined
+  const rankedCandidates = combined
     .map((score, index) => ({ index, score }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, targetCount)
-    .sort((a, b) => a.index - b.index); // restore reading order
+    .sort((a, b) => b.score - a.score);
+
+  const chosen = [];
+  const chosenTokens = [];
+  for (const candidate of rankedCandidates) {
+    if (chosen.length >= targetCount) break;
+    const tokens = new Set(sentences[candidate.index].toLowerCase().match(/[a-z0-9]+/g) || []);
+    let tooSimilar = false;
+    for (const prev of chosenTokens) {
+      const overlap = [...tokens].filter((t) => prev.has(t)).length / Math.max(1, Math.min(tokens.size, prev.size));
+      if (overlap > 0.72) { tooSimilar = true; break; }
+    }
+    if (!tooSimilar) {
+      chosen.push(candidate);
+      chosenTokens.push(tokens);
+    }
+  }
+  // If diversity filtering was too aggressive, fill remaining slots.
+  for (const candidate of rankedCandidates) {
+    if (chosen.length >= targetCount) break;
+    if (!chosen.some((x) => x.index === candidate.index)) chosen.push(candidate);
+  }
+  const ranked = chosen.sort((a, b) => a.index - b.index); // reading order
 
   const summarySentences = ranked.map((r) => sentences[r.index]);
   return {

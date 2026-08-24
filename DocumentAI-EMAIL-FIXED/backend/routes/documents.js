@@ -14,6 +14,7 @@ const { extractKeywords, extractKeyPoints } = require('../nlp/keywords');
 // table-aware, confidence-scored). nlp/qa.js is preserved untouched and
 // still exported for any other caller/test that depends on it directly.
 const { answerDocumentQuestion } = require('../services/documentQueryService');
+const { buildChunks } = require('../nlp/documentProcessor');
 
 const router = express.Router();
 
@@ -176,6 +177,40 @@ router.get('/:id/download', requireAuth, async (req, res) => {
   res.redirect(doc.cloudinaryUrl);
 });
 
+// Reprocess a document from its Cloudinary copy. This is intentionally
+// separate from upload so a failed/stuck document can be repaired without
+// uploading it again.
+router.post('/:id/reprocess', requireAuth, async (req, res) => {
+  const doc = await getOwnedDocOr404(req, res);
+  if (!doc) return;
+
+  if (!doc.cloudinaryUrl) {
+    return res.status(422).json({ error: 'No stored document copy is available for reprocessing.' });
+  }
+
+  if (doc.processingStatus === 'processing') {
+    return res.status(409).json({ error: 'This document is already processing.' });
+  }
+
+  doc.processingStatus = 'processing';
+  doc.processingStartedAt = new Date();
+  doc.processingError = null;
+  await doc.save();
+
+  res.status(202).json({ document: doc.toPublic() });
+
+  setImmediate(async () => {
+    try {
+      const response = await fetch(doc.cloudinaryUrl);
+      if (!response.ok) throw new Error(`Cloudinary returned HTTP ${response.status}`);
+      const arrayBuffer = await response.arrayBuffer();
+      await processDocumentRecord(doc, Buffer.from(arrayBuffer));
+    } catch (err) {
+      console.error(`Reprocessing failed for ${doc._id}:`, err.message);
+    }
+  });
+});
+
 // ---- NLP endpoints -------------------------------------------------------
 router.post('/:id/question', requireAuth, async (req, res) => {
   const doc = await getOwnedDocOr404(req, res);
@@ -186,7 +221,11 @@ router.post('/:id/question', requireAuth, async (req, res) => {
   if (!question || !question.trim()) {
     return res.status(400).json({ error: 'Please enter a question.' });
   }
-  const chunks = await DocumentChunk.find({ documentId: doc._id }).sort({ chunkIndex: 1 });
+  let chunks = await DocumentChunk.find({ documentId: doc._id }).sort({ chunkIndex: 1 });
+  if (!chunks.length && doc.extractedText) {
+    const pages = doc.pages?.length ? doc.pages : [doc.extractedText];
+    chunks = buildChunks(pages);
+  }
   const result = answerDocumentQuestion(
     question,
     chunks.map((c) => ({ text: c.text, page: c.page, section: c.section, chunkType: c.chunkType }))

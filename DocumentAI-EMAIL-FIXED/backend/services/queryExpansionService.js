@@ -9,6 +9,7 @@
  */
 const { tokenizeNoStop, stem } = require('../nlp/preprocess');
 const { relatedStems } = require('../nlp/synonyms');
+const { expandConceptPhrases } = require('../nlp/semanticConcepts');
 
 /**
  * @param {string} query
@@ -21,6 +22,14 @@ function expandQuery(query) {
   const tokens = tokenizeNoStop(query);
   const originalStems = [...new Set(tokens.map(stem))];
   const expandedSet = new Set();
+
+  // Phrase-level concepts catch natural questions whose meaning is expressed
+  // differently from the document vocabulary (for example, 'get my money
+  // back' -> refund, 'end my plan' -> cancellation).
+  const conceptPhrases = expandConceptPhrases(query);
+  for (const phrase of conceptPhrases) {
+    for (const token of tokenizeNoStop(phrase)) expandedSet.add(stem(token));
+  }
 
   for (const s of originalStems) {
     for (const related of relatedStems(s)) {
