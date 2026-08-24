@@ -11,6 +11,12 @@ const STATUS_STYLES = {
   error: { label: 'Error', className: 'text-danger bg-danger/10' },
 };
 
+function parseDate(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function formatBytes(bytes) {
   if (!bytes) return '—';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -88,7 +94,7 @@ export default function DocumentCard({ doc, view = 'grid', onOpenChat, onOpenSum
           {status.label}
         </span>
         <span className="flex items-center gap-1 text-[11px] text-muted dark:text-dark-muted">
-          <Clock size={11} /> {new Date(doc.createdAt.replace(' ', 'T') + 'Z').toLocaleDateString()}
+          <Clock size={11} /> {parseDate(doc.createdAt)?.toLocaleDateString() || '—'}
         </span>
       </div>
     </div>

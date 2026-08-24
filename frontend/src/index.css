@@ -47,3 +47,52 @@ body {
   max-width: none !important;
   flex: none !important;
 }
+
+
+/* Auth/form polish -------------------------------------------------- */
+/* Prevent the text caret from appearing when users click normal UI text. */
+body { caret-color: transparent; }
+input, textarea, [contenteditable="true"] { caret-color: auto; }
+
+/* Keep Lucide icons from sitting on top of the first character. */
+.auth-input-left {
+  padding-left: 2.9rem !important;
+}
+.auth-input-right {
+  padding-right: 2.9rem !important;
+}
+
+/* The CAPTCHA is intentionally larger than the original 200x70 box so
+   every character remains visible on desktop and smaller screens. */
+.captcha-box {
+  width: 240px;
+  height: 82px;
+  flex: 0 0 240px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+.captcha-box svg {
+  display: block !important;
+  width: 240px !important;
+  height: 82px !important;
+  max-width: none !important;
+  flex: none !important;
+}
+@media (max-width: 560px) {
+  .captcha-box {
+    width: 100%;
+    max-width: 240px;
+    flex-basis: auto;
+  }
+}
+
+/* Avoid slow visual effects on auth screens while keeping the design clean. */
+.auth-page .animate-rise {
+  animation-duration: 0.12s;
+}

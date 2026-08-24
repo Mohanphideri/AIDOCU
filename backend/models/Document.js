@@ -24,6 +24,7 @@ const documentSchema = new Schema(
       index: true,
     },
     processingError: { type: String, default: null },
+    processingStartedAt: { type: Date, default: null },
 
     isFavorite: { type: Boolean, default: false },
 

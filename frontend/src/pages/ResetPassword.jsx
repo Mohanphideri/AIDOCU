@@ -40,7 +40,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-canvas dark:bg-dark-canvas p-6">
+    <div className="auth-page min-h-screen flex items-center justify-center bg-canvas dark:bg-dark-canvas p-6">
       <div className="w-full max-w-md animate-rise">
         <div className="rounded-2xl border border-border dark:border-dark-border bg-white dark:bg-dark-surface p-7 shadow-sm">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white mb-5">
@@ -55,7 +55,7 @@ export default function ResetPassword() {
                   <label className="block text-sm font-medium text-ink dark:text-dark-ink mb-1.5">New password</label>
                   <div className="relative">
                     <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-                    <input type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} className="input pl-10 pr-10" placeholder="••••••••" autoComplete="new-password" />
+                    <input type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} className="input auth-input-left auth-input-right" placeholder="••••••••" autoComplete="new-password" />
                     <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                   {password && <div className="mt-3 grid grid-cols-2 gap-1.5">{RULES.map((r) => <span key={r.label} className={`text-xs ${r.test(password) ? 'text-emerald-600' : 'text-muted'}`}>{r.test(password) ? '✓' : '○'} {r.label}</span>)}</div>}
@@ -64,7 +64,7 @@ export default function ResetPassword() {
                   <label className="block text-sm font-medium text-ink dark:text-dark-ink mb-1.5">Confirm password</label>
                   <div className="relative">
                     <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-                    <input type={showConfirm ? 'text' : 'password'} required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="input pl-10 pr-10" placeholder="••••••••" autoComplete="new-password" />
+                    <input type={showConfirm ? 'text' : 'password'} required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="input auth-input-left auth-input-right" placeholder="••••••••" autoComplete="new-password" />
                     <button type="button" onClick={() => setShowConfirm((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted">{showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                 </div>

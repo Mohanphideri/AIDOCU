@@ -7,7 +7,7 @@ const Message = require('../models/Message');
 const { requireAuth } = require('../middleware/auth');
 const { uploadLimiter } = require('../middleware/rateLimiters');
 const { uploadBuffer, deleteFile } = require('../services/cloudinaryService');
-const { processDocument } = require('../nlp/documentProcessor');
+const { processDocumentRecord } = require('../services/documentProcessingService');
 const { summarize } = require('../nlp/summarizer');
 const { extractKeywords, extractKeyPoints } = require('../nlp/keywords');
 // Upgraded answering pipeline (intent-classified, hybrid-retrieval,
@@ -97,50 +97,18 @@ router.post('/upload', requireAuth, uploadLimiter, (req, res) => {
       cloudinaryUrl: uploadResult.secure_url,
       cloudinaryResourceType: uploadResult.resource_type,
       processingStatus: 'processing',
+      processingStartedAt: new Date(),
     });
 
     res.status(202).json({ document: doc.toPublic() });
 
-    // NLP processing runs from the same in-memory buffer, deferred so the
-    // upload response returns immediately and the client polls status.
+    // Process asynchronously, but persist the job state so it can be
+    // recovered after a Render restart/deploy. The response is already 202.
     setImmediate(async () => {
       try {
-        const result = await processDocument(req.file.buffer, fileType);
-
-        await DocumentChunk.deleteMany({ documentId: doc._id });
-        if (result.chunks.length) {
-          await DocumentChunk.insertMany(
-            result.chunks.map((c, i) => ({
-              documentId: doc._id,
-              userId: req.user._id,
-              text: c.text,
-              page: c.page,
-              section: c.section,
-              chunkIndex: i,
-              chunkType: c.chunkType || 'paragraph',
-            }))
-          );
-        }
-
-        doc.extractedText = result.extractedText;
-        doc.pageCount = result.pageCount;
-        doc.language = result.language;
-        doc.pages = result.pages;
-        doc.keywords = result.keywords;
-        doc.keyPoints = result.keyPoints;
-        doc.processingStatus = 'ready';
-        await doc.save();
-      } catch (procErr) {
-        console.error('Document processing failed:', procErr);
-        doc.processingStatus = 'error';
-        doc.processingError = procErr.code === 'NO_TEXT_FOUND'
-          ? procErr.message
-          : 'This document could not be processed. It may be corrupted or unsupported.';
-        try {
-          await doc.save();
-        } catch (saveErr) {
-          console.error('Could not persist document processing error:', saveErr);
-        }
+        await processDocumentRecord(doc, req.file.buffer);
+      } catch {
+        // processDocumentRecord already persists the error state.
       }
     });
   });

@@ -45,6 +45,32 @@ export default function DocumentsPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Keep processing badges/statuses live. The previous UI only polled during
+  // the upload dialog, so a slow/background job could leave cards showing
+  // Processing forever until the page was manually refreshed.
+  useEffect(() => {
+    if (!documents.some((d) => d.processingStatus === 'processing' || d.processingStatus === 'pending')) return undefined;
+
+    let cancelled = false;
+    const poll = async () => {
+      const active = documents.filter((d) => d.processingStatus === 'processing' || d.processingStatus === 'pending');
+      const updates = await Promise.allSettled(active.map((d) => api.getDocument(d.id)));
+      if (cancelled) return;
+      const byId = new Map();
+      updates.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value?.document) {
+          byId.set(result.value.document.id, result.value.document);
+        }
+      });
+      if (byId.size) {
+        setDocuments((current) => current.map((d) => byId.get(d.id) || d));
+      }
+    };
+
+    const timer = setInterval(poll, 2000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [documents]);
+
   useEffect(() => {
     const openId = params.get('open');
     if (openId && documents.length) {

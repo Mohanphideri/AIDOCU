@@ -24,7 +24,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-canvas dark:bg-dark-canvas p-6">
+    <div className="auth-page min-h-screen flex items-center justify-center bg-canvas dark:bg-dark-canvas p-6">
       <div className="w-full max-w-md animate-rise">
         <Link to="/login" className="inline-flex items-center gap-2 text-sm text-muted dark:text-dark-muted hover:text-ink dark:hover:text-dark-ink mb-7">
           <ArrowLeft size={15} /> Back to sign in
@@ -44,7 +44,7 @@ export default function ForgotPassword() {
                   <label className="block text-sm font-medium text-ink dark:text-dark-ink mb-1.5">Email</label>
                   <div className="relative">
                     <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input pl-10" placeholder="you@company.com" autoComplete="email" />
+                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input auth-input-left" placeholder="you@company.com" autoComplete="email" />
                   </div>
                 </div>
                 {error && <p className="text-sm text-danger bg-danger/5 border border-danger/20 rounded-lg px-3 py-2">{error}</p>}

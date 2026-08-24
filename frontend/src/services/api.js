@@ -8,7 +8,12 @@ function getToken() {
 async function request(path, { method = 'GET', body, isForm = false, headers = {} } = {}) {
   const token = getToken();
   const finalHeaders = { ...headers };
-  if (!isForm) finalHeaders['Content-Type'] = 'application/json';
+
+  // Do not add Content-Type to requests without a body. This avoids
+  // unnecessary CORS preflights for public GET endpoints such as CAPTCHA.
+  if (!isForm && body !== undefined && body !== null) {
+    finalHeaders['Content-Type'] = 'application/json';
+  }
   if (token) finalHeaders['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}`, {
@@ -33,9 +38,21 @@ async function request(path, { method = 'GET', body, isForm = false, headers = {
   return data;
 }
 
+let captchaInFlight = null;
+
+function getCaptchaFast() {
+  if (!captchaInFlight) {
+    captchaInFlight = request('/auth/captcha').finally(() => {
+      captchaInFlight = null;
+    });
+  }
+  return captchaInFlight;
+}
+
 export const api = {
   // auth
-  getCaptcha: () => request('/auth/captcha'),
+  // Deduplicates simultaneous CAPTCHA requests (including React StrictMode).
+  getCaptcha: () => getCaptchaFast(),
   refreshCaptcha: (captchaId) => request('/auth/captcha/refresh', { method: 'POST', body: { captchaId } }),
   register: (payload) => request('/auth/register', { method: 'POST', body: payload }),
   verifyRegistration: (payload) => request('/auth/verify-registration', { method: 'POST', body: payload }),

@@ -60,7 +60,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-canvas dark:bg-dark-canvas">
+    <div className="auth-page min-h-screen grid lg:grid-cols-2 bg-canvas dark:bg-dark-canvas">
       {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-between bg-ink dark:bg-dark-surface p-12 relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_50%_40%_at_20%_0%,rgba(99,91,255,0.25),transparent)]" />
@@ -128,7 +128,7 @@ export default function Login() {
                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
                 <input
                   type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="input pl-10 transition-shadow focus:shadow-[0_0_0_4px_rgba(99,91,255,0.12)]" placeholder="you@company.com" autoComplete="email"
+                  className="input auth-input-left" placeholder="you@company.com" autoComplete="email"
                 />
               </div>
             </div>
@@ -141,7 +141,7 @@ export default function Login() {
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
                 <input
                   type={showPassword ? 'text' : 'password'} required value={password}
-                  onChange={(e) => setPassword(e.target.value)} className="input pl-10 pr-10 transition-shadow focus:shadow-[0_0_0_4px_rgba(99,91,255,0.12)]"
+                  onChange={(e) => setPassword(e.target.value)} className="input auth-input-left auth-input-right"
                   placeholder="••••••••" autoComplete="current-password"
                 />
                 <button type="button" onClick={() => setShowPassword((s) => !s)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink dark:hover:text-dark-ink transition-colors">

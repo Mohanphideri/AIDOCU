@@ -131,7 +131,7 @@ function buildChunks(pages) {
   return chunks.length ? chunks : [{ text: pages.join(' '), page: 1, section: null, chunkType: 'paragraph' }];
 }
 
-async function processDocument(buffer, fileType) {
+async function processDocument(buffer, fileType, options = {}) {
   const { text: rawText, pageCount, rawPages } = await extractText(buffer, fileType);
   const text = cleanText(rawText || '');
 
@@ -144,8 +144,12 @@ async function processDocument(buffer, fileType) {
   const language = detectLanguage(text);
   const pages = synthesizePages(text, rawPages);
   const chunks = buildChunks(pages);
-  const keywords = extractKeywords(text, 15);
-  const keyPoints = extractKeyPoints(text, 6);
+  // Keyword/key-point extraction is intentionally optional. It is much more
+  // expensive than text extraction and is not required before chat can start.
+  // Upload processing uses the fast path and generates these derived fields
+  // after the document is marked ready.
+  const keywords = options.includeDerived ? extractKeywords(text, 15) : [];
+  const keyPoints = options.includeDerived ? extractKeyPoints(text, 6) : [];
 
   return {
     extractedText: text,

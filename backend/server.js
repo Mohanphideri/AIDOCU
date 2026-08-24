@@ -11,6 +11,7 @@ const documentRoutes = require('./routes/documents');
 const conversationRoutes = require('./routes/conversations');
 const { requireAuth } = require('./middleware/auth');
 const Document = require('./models/Document');
+const { recoverStuckDocuments } = require('./services/documentProcessingService');
 
 const app = express();
 
@@ -162,6 +163,12 @@ connectDB()
   .then(async () => {
     await repairDocumentTextIndexes();
     await repairConversationIndexes();
+    // Recover documents that were left in processing by a previous Render
+    // restart/deploy. This also repairs older documents that have no
+    // processingStartedAt field but have been stale for more than two minutes.
+    recoverStuckDocuments().catch((err) => {
+      console.error('Document processing recovery failed:', err.message);
+    });
     app.listen(PORT, () => {
       console.log(`DocumentAI backend listening on http://localhost:${PORT}`);
       console.log('LLM usage: NONE — NLP engine (TF-IDF / BM25 / TextRank) active.');

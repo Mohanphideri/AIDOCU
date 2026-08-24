@@ -22,7 +22,7 @@ export default function DocumentUpload({ onUploaded, compact = false }) {
       // Poll for processing completion
       let attempts = 0;
       let current = document;
-      while (current.processingStatus === 'processing' && attempts < 40) {
+      while ((current.processingStatus === 'processing' || current.processingStatus === 'pending') && attempts < 120) {
         await new Promise((r) => setTimeout(r, 900));
         const { document: refreshed } = await api.getDocument(document.id);
         current = refreshed;
@@ -30,7 +30,10 @@ export default function DocumentUpload({ onUploaded, compact = false }) {
       }
       if (current.processingStatus === 'error') {
         setError(current.processingError || 'Processing failed for this document.');
+      } else if (current.processingStatus === 'ready') {
+        onUploaded?.(current);
       } else {
+        setError('The document is taking longer than expected. It is still processing in the background. Refresh the documents list to see when it is ready.');
         onUploaded?.(current);
       }
     } catch (err) {

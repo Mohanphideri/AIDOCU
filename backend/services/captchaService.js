@@ -43,8 +43,8 @@ async function generateCaptcha(sessionId) {
     background: '#F8FAFC',
     ignoreChars: '', // we control the charset explicitly below
     charPreset: CHARSET,
-    width: 200,
-    height: 70,
+    width: 240,
+    height: 82,
   });
 
   const code = captcha.text; // plaintext — used only to compute the hash below
