@@ -63,11 +63,6 @@ export default function RegisterPage() {
             ))}
           </select>
           {universitiesError && <div className="error-text">{universitiesError}</div>}
-          {selectedUniversity && (
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: 4 }}>
-              Use your @{selectedUniversity.emailDomain} email address below.
-            </p>
-          )}
         </div>
         <div className="form-field">
           <label htmlFor="name">Full Name</label>

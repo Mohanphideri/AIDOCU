@@ -17,14 +17,6 @@ async function registerStudent({ universityId, name, uid, universityEmail, phone
   }
 
   const normalizedEmail = universityEmail.trim().toLowerCase();
-  const domain = normalizedEmail.split('@')[1];
-  if (!domain || domain !== university.emailDomain) {
-    throw new ApiError(
-      `University email must be a valid @${university.emailDomain} address`,
-      400,
-      'INVALID_UNIVERSITY_EMAIL_DOMAIN'
-    );
-  }
 
   const normalizedUid = uid.trim().toUpperCase();
 
