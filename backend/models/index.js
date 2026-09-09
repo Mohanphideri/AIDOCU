@@ -1,0 +1,37 @@
+module.exports = {
+  University: require('./University'),
+  AcademicSession: require('./AcademicSession'),
+  Faculty: require('./Faculty'),
+  Department: require('./Department'),
+  Programme: require('./Programme'),
+  Semester: require('./Semester'),
+  Subject: require('./Subject'),
+
+  Admin: require('./Admin'),
+  Supervisor: require('./Supervisor'),
+  FacultyMember: require('./FacultyMember'),
+  Student: require('./Student'),
+  StudentVerification: require('./StudentVerification'),
+  PasswordResetToken: require('./PasswordResetToken'),
+
+  Exam: require('./Exam'),
+  ExamBlueprint: require('./ExamBlueprint'),
+  Question: require('./Question'),
+  QuestionVersion: require('./QuestionVersion'),
+  FacultyQuestionSubmission: require('./FacultyQuestionSubmission'),
+  Paper: require('./Paper'),
+  ExamQuestion: require('./ExamQuestion'),
+  Translation: require('./Translation'),
+
+  ExamEligibility: require('./ExamEligibility'),
+  ExamAttempt: require('./ExamAttempt'),
+  AttemptQuestion: require('./AttemptQuestion'),
+  Answer: require('./Answer'),
+
+  Result: require('./Result'),
+  ResultRevision: require('./ResultRevision'),
+  StudentQuery: require('./StudentQuery'),
+  ProctoringEvent: require('./ProctoringEvent'),
+  AuditLog: require('./AuditLog'),
+  EmailLog: require('./EmailLog'),
+};
