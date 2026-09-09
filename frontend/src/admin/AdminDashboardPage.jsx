@@ -7,11 +7,15 @@ import TranslationsTab from './TranslationsTab';
 import ResultsTab from './ResultsTab';
 import QueriesTab from './QueriesTab';
 import AuditLogTab from './AuditLogTab';
+import DashboardTab from './DashboardTab';
+import StudentsTab from './StudentsTab';
 
 const TABS = [
+  'Dashboard',
   'Exams',
   'Academic Structure',
   'Eligibility',
+  'Students',
   'Question Bank',
   'Faculty Submissions',
   'Blueprint & Papers',
@@ -431,9 +435,11 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
+      {activeTab === 'Dashboard' && <DashboardTab />}
       {activeTab === 'Exams' && <ExamsTab />}
       {activeTab === 'Academic Structure' && <AcademicStructureTab />}
       {activeTab === 'Eligibility' && <EligibilityTab />}
+      {activeTab === 'Students' && <StudentsTab />}
       {activeTab === 'Question Bank' && <QuestionBankTab />}
       {activeTab === 'Faculty Submissions' && <FacultySubmissionsTab />}
       {activeTab === 'Blueprint & Papers' && <PapersTab />}

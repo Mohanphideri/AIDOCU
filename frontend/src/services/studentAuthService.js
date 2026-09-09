@@ -1,5 +1,9 @@
 import apiClient from '../api/client';
 
+export function listUniversities() {
+  return apiClient.get('/auth/student/universities');
+}
+
 export function registerStudent(payload) {
   return apiClient.post('/auth/student/register', payload);
 }

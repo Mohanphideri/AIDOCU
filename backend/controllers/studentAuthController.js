@@ -1,10 +1,21 @@
 const studentService = require('../services/studentService');
-const { Student } = require('../models');
+const { Student, University } = require('../models');
 const { comparePassword } = require('../utils/passwordHash');
 const { signToken } = require('../utils/jwt');
 const { success, error } = require('../utils/apiResponse');
 const { ApiError } = require('../middleware/errorHandler');
 const auditService = require('../services/auditService');
+
+async function listUniversitiesPublic(req, res, next) {
+  try {
+    const universities = await University.find({ isActive: true })
+      .select('name emailDomain')
+      .sort({ name: 1 });
+    return success(res, universities);
+  } catch (err) {
+    return next(err);
+  }
+}
 
 async function register(req, res, next) {
   try {
@@ -83,4 +94,4 @@ async function login(req, res, next) {
   }
 }
 
-module.exports = { register, verifyEmail, resendVerification, login };
+module.exports = { listUniversitiesPublic, register, verifyEmail, resendVerification, login };

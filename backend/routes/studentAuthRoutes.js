@@ -9,6 +9,7 @@ const {
 
 const router = express.Router();
 
+router.get('/universities', controller.listUniversitiesPublic);
 router.post('/register', registrationLimiter, registerRules, controller.register);
 router.post('/verify', verificationLimiter, verifyRules, controller.verifyEmail);
 router.post('/resend-verification', verificationLimiter, controller.resendVerification);

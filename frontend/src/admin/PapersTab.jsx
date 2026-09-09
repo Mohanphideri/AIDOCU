@@ -1,9 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import * as adminApi from '../services/adminApiService';
+import QuestionPicker from './QuestionPicker';
+import PaperPreview from './PaperPreview';
 
-// Blueprint -> Generate Paper -> Analyze -> Lock, per spec sections 29-33.
-// A locked paper is immutable; this UI intentionally does not offer an
-// "unlock" action.
+const MODES = [
+  { value: 'AUTOMATIC', label: 'Automatic', help: 'Questions are picked automatically to satisfy the blueprint.' },
+  { value: 'MANUAL', label: 'Manual', help: 'You pick every question for every section yourself.' },
+  { value: 'HYBRID', label: 'Hybrid', help: 'You pick some questions per section; the rest are filled automatically.' },
+];
+
+// Blueprint -> Generate Paper (Automatic/Manual/Hybrid) -> Edit -> Preview -> Analyze -> Lock.
+// A locked paper is immutable; this UI intentionally does not offer an "unlock" action.
 export default function PapersTab() {
   const [exams, setExams] = useState([]);
   const [examId, setExamId] = useState('');
@@ -11,11 +18,20 @@ export default function PapersTab() {
     { name: 'Section A', questionCount: 5, marksPerQuestion: 1 },
   ]);
   const [blueprint, setBlueprint] = useState(null);
+  const [mode, setMode] = useState('AUTOMATIC');
+  const [manualSelections, setManualSelections] = useState({});
+
   const [paper, setPaper] = useState(null);
+  const [examQuestions, setExamQuestions] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [missing, setMissing] = useState(null);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showAdder, setShowAdder] = useState(null); // sectionName currently adding into
+  const [adderSelection, setAdderSelection] = useState([]);
+
+  const selectedExam = exams.find((ex) => ex._id === examId);
 
   const loadExams = useCallback(() => {
     adminApi.listExams().then((res) => setExams(res.data.items || [])).catch((err) => setError(err.message));
@@ -24,6 +40,17 @@ export default function PapersTab() {
   useEffect(() => {
     loadExams();
   }, [loadExams]);
+
+  function resetForNewExam(id) {
+    setExamId(id);
+    setBlueprint(null);
+    setPaper(null);
+    setExamQuestions(null);
+    setAnalysis(null);
+    setMissing(null);
+    setManualSelections({});
+    setShowPreview(false);
+  }
 
   function updateSection(idx, patch) {
     setSections((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
@@ -42,14 +69,33 @@ export default function PapersTab() {
     }
   }
 
-  async function handleGenerate(mode) {
+  function toggleManualQuestion(sectionName, questionId) {
+    setManualSelections((prev) => {
+      const current = prev[sectionName] || [];
+      const next = current.includes(questionId)
+        ? current.filter((id) => id !== questionId)
+        : [...current, questionId];
+      return { ...prev, [sectionName]: next };
+    });
+  }
+
+  async function loadPreview(paperId) {
+    const res = await adminApi.previewPaper(paperId);
+    setExamQuestions(res.data);
+  }
+
+  async function handleGenerate() {
     setError(null);
     setMessage(null);
     setMissing(null);
     try {
-      const res = await adminApi.generatePaper({ examId, blueprintId: blueprint._id, mode });
+      const payload = { examId, blueprintId: blueprint._id, mode };
+      if (mode !== 'AUTOMATIC') payload.manualSelections = manualSelections;
+
+      const res = await adminApi.generatePaper(payload);
       setPaper(res.data);
       setMessage('Paper generated successfully.');
+      await loadPreview(res.data._id);
     } catch (err) {
       if (err.code === 'BLUEPRINT_NOT_SATISFIED') {
         setMissing(err.missing);
@@ -57,6 +103,66 @@ export default function PapersTab() {
       } else {
         setError(err.message || 'Could not generate paper');
       }
+    }
+  }
+
+  async function handleRemoveQuestion(examQuestionId) {
+    if (!window.confirm('Remove this question from the paper?')) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await adminApi.editPaper(paper._id, { removeExamQuestionIds: [examQuestionId] });
+      setPaper(updated.data);
+      await loadPreview(paper._id);
+      setMessage('Question removed.');
+    } catch (err) {
+      setError(err.message || 'Could not remove question');
+    }
+  }
+
+  async function handleMove(examQuestionId, direction) {
+    const idx = examQuestions.findIndex((eq) => eq._id === examQuestionId);
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= examQuestions.length) return;
+
+    const reordered = [...examQuestions];
+    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+
+    setError(null);
+    try {
+      const reorder = reordered.map((eq, i) => ({ examQuestionId: eq._id, orderIndex: i }));
+      const updated = await adminApi.editPaper(paper._id, { reorder });
+      setPaper(updated.data);
+      await loadPreview(paper._id);
+    } catch (err) {
+      setError(err.message || 'Could not reorder questions');
+    }
+  }
+
+  function openAdder(sectionName) {
+    setShowAdder(sectionName);
+    setAdderSelection([]);
+  }
+
+  async function handleAddQuestions() {
+    if (!adderSelection.length) {
+      setShowAdder(null);
+      return;
+    }
+    setError(null);
+    try {
+      const updated = await adminApi.editPaper(paper._id, {
+        addQuestionIds: adderSelection,
+        targetSectionName: showAdder,
+        marksPerQuestion: sections.find((s) => s.name === showAdder)?.marksPerQuestion || 1,
+      });
+      setPaper(updated.data);
+      await loadPreview(paper._id);
+      setMessage('Questions added.');
+      setShowAdder(null);
+      setAdderSelection([]);
+    } catch (err) {
+      setError(err.message || 'Could not add questions');
     }
   }
 
@@ -82,6 +188,8 @@ export default function PapersTab() {
     }
   }
 
+  const existingQuestionIds = (examQuestions || []).map((eq) => eq.questionId?._id || eq.questionId).filter(Boolean);
+
   return (
     <div>
       <h2>Blueprint &amp; Paper Generation</h2>
@@ -90,7 +198,7 @@ export default function PapersTab() {
 
       <div className="form-field">
         <label>Examination</label>
-        <select value={examId} onChange={(e) => { setExamId(e.target.value); setBlueprint(null); setPaper(null); setAnalysis(null); }}>
+        <select value={examId} onChange={(e) => resetForNewExam(e.target.value)}>
           <option value="">Select an exam…</option>
           {exams.map((ex) => (
             <option key={ex._id} value={ex._id}>{ex.subjectCode} — {ex.examType} ({ex.status})</option>
@@ -120,11 +228,45 @@ export default function PapersTab() {
             <button type="button" className="btn-primary" onClick={handleCreateBlueprint}>Save Blueprint</button>
           </div>
 
-          {blueprint && (
+          {blueprint && !paper && (
             <>
               <h3>2. Generate paper</h3>
-              <button type="button" className="btn-primary" onClick={() => handleGenerate('AUTOMATIC')} style={{ marginRight: 8 }}>
-                Generate Automatically
+              <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                {MODES.map((m) => (
+                  <label key={m.value} style={{ flex: 1, border: '1px solid var(--color-border)', borderRadius: 6, padding: 10, cursor: 'pointer', background: mode === m.value ? 'var(--color-surface-active, #eef3ff)' : 'transparent' }}>
+                    <div>
+                      <input type="radio" name="mode" checked={mode === m.value} onChange={() => setMode(m.value)} style={{ marginRight: 6 }} />
+                      <strong>{m.label}</strong>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: 4 }}>{m.help}</div>
+                  </label>
+                ))}
+              </div>
+
+              {mode !== 'AUTOMATIC' && selectedExam && (
+                <div style={{ marginBottom: 14 }}>
+                  {blueprint.sections.map((section) => (
+                    <div key={section.name} style={{ marginBottom: 16 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                        {section.name} — need {section.questionCount} question(s)
+                        {' '}
+                        <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>
+                          ({(manualSelections[section.name] || []).length} selected manually
+                          {mode === 'HYBRID' ? ', rest filled automatically' : ''})
+                        </span>
+                      </div>
+                      <QuestionPicker
+                        subjectId={selectedExam.subjectId}
+                        selectedIds={manualSelections[section.name] || []}
+                        onToggle={(qid) => toggleManualQuestion(section.name, qid)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button type="button" className="btn-primary" onClick={handleGenerate}>
+                Generate Paper
               </button>
               {missing && (
                 <div className="error-text">
@@ -139,10 +281,58 @@ export default function PapersTab() {
 
           {paper && (
             <>
-              <h3>3. Review &amp; lock</h3>
-              <p>Paper status: <strong>{paper.status || 'GENERATED'}</strong></p>
+              <h3>3. Review, edit &amp; lock</h3>
+              <p>
+                Paper status: <strong>{paper.status}</strong>
+                {' · '}{paper.totalQuestions} question(s), {paper.totalMarks} mark(s)
+              </p>
+
+              {paper.status !== 'LOCKED' && examQuestions && (
+                <div style={{ marginBottom: 18 }}>
+                  <h4>Editor</h4>
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                    Remove a question, reorder within the paper, or add more from the question bank. Each change re-marks the paper "In Review" until you lock it.
+                  </p>
+                  {[...new Set(examQuestions.map((eq) => eq.sectionName))].map((sectionName) => (
+                    <div key={sectionName} style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong>{sectionName}</strong>
+                        <button type="button" className="btn-secondary" onClick={() => openAdder(sectionName)}>+ Add question</button>
+                      </div>
+                      {examQuestions.filter((eq) => eq.sectionName === sectionName).map((eq, idx, arr) => (
+                        <div key={eq._id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
+                          <div style={{ flex: 1, fontSize: '0.9rem' }}>
+                            {eq.orderIndex + 1}. {eq.questionVersionId?.questionText} <span style={{ color: 'var(--color-text-muted)' }}>[{eq.marks} mark(s)]</span>
+                          </div>
+                          <button type="button" className="btn-secondary" disabled={idx === 0} onClick={() => handleMove(eq._id, -1)}>↑</button>
+                          <button type="button" className="btn-secondary" disabled={idx === arr.length - 1} onClick={() => handleMove(eq._id, 1)}>↓</button>
+                          <button type="button" className="btn-secondary" onClick={() => handleRemoveQuestion(eq._id)}>Remove</button>
+                        </div>
+                      ))}
+                      {showAdder === sectionName && selectedExam && (
+                        <div style={{ marginTop: 8 }}>
+                          <QuestionPicker
+                            subjectId={selectedExam.subjectId}
+                            selectedIds={adderSelection}
+                            excludeQuestionIds={existingQuestionIds}
+                            onToggle={(qid) => setAdderSelection((prev) => (prev.includes(qid) ? prev.filter((id) => id !== qid) : [...prev, qid]))}
+                          />
+                          <div style={{ marginTop: 8 }}>
+                            <button type="button" className="btn-primary" onClick={handleAddQuestions} style={{ marginRight: 8 }}>Add Selected</button>
+                            <button type="button" className="btn-secondary" onClick={() => setShowAdder(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <button type="button" className="btn-secondary" onClick={handleAnalyze} style={{ marginRight: 8 }}>
                 Analyze Paper
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setShowPreview((v) => !v)} style={{ marginRight: 8 }}>
+                {showPreview ? 'Hide Preview' : 'Formal Preview'}
               </button>
               {paper.status !== 'LOCKED' && (
                 <button type="button" className="btn-primary" onClick={handleLock}>Lock Paper</button>
@@ -153,6 +343,12 @@ export default function PapersTab() {
                 <pre style={{ background: '#f5f6f8', padding: 12, marginTop: 10, overflowX: 'auto' }}>
                   {JSON.stringify(analysis, null, 2)}
                 </pre>
+              )}
+
+              {showPreview && examQuestions && (
+                <div style={{ marginTop: 14 }}>
+                  <PaperPreview exam={selectedExam} examQuestions={examQuestions} />
+                </div>
               )}
             </>
           )}

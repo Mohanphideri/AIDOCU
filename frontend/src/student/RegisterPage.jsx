@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { registerStudent } from '../services/studentAuthService';
+import { registerStudent, listUniversities } from '../services/studentAuthService';
 
 const initialForm = {
   universityId: '',
@@ -14,9 +14,19 @@ const initialForm = {
 
 export default function RegisterPage() {
   const [form, setForm] = useState(initialForm);
+  const [universities, setUniversities] = useState([]);
+  const [universitiesError, setUniversitiesError] = useState(null);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    listUniversities()
+      .then((res) => setUniversities(res.data || []))
+      .catch((err) => setUniversitiesError(err.message || 'Could not load the list of universities'));
+  }, []);
+
+  const selectedUniversity = universities.find((u) => u._id === form.universityId);
 
   function handleChange(e) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -46,8 +56,18 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit}>
         <div className="form-field">
           <label htmlFor="universityId">University</label>
-          {/* In production this is a select populated from GET /api/... universities list */}
-          <input id="universityId" name="universityId" value={form.universityId} onChange={handleChange} required />
+          <select id="universityId" name="universityId" value={form.universityId} onChange={handleChange} required>
+            <option value="">Select your university…</option>
+            {universities.map((u) => (
+              <option key={u._id} value={u._id}>{u.name}</option>
+            ))}
+          </select>
+          {universitiesError && <div className="error-text">{universitiesError}</div>}
+          {selectedUniversity && (
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: 4 }}>
+              Use your @{selectedUniversity.emailDomain} email address below.
+            </p>
+          )}
         </div>
         <div className="form-field">
           <label htmlFor="name">Full Name</label>
