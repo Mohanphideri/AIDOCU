@@ -29,13 +29,14 @@ a {
 }
 
 .app-header {
-  background: var(--color-navy);
+  background: linear-gradient(135deg, var(--color-navy) 0%, var(--color-navy-dark) 100%);
   color: #fff;
-  padding: 14px 24px;
+  padding: 16px 24px;
   display: flex;
   align-items: center;
   gap: 12px;
   border-bottom: 3px solid var(--color-gold);
+  box-shadow: 0 2px 8px rgba(16, 28, 51, 0.15);
 }
 
 .app-header .institution-name {
@@ -48,8 +49,15 @@ a {
   margin: 40px auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 32px;
+  border-radius: 10px;
+  padding: 36px;
+  box-shadow: 0 4px 20px rgba(16, 28, 51, 0.06);
+}
+
+.page-container h1,
+.page-container h2 {
+  margin-top: 0;
+  color: var(--color-navy);
 }
 
 .form-field {
@@ -66,31 +74,53 @@ a {
 .form-field input,
 .form-field select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 11px 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: 1rem;
   font-family: inherit;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-field input:hover,
+.form-field select:hover {
+  border-color: #b7bfcc;
 }
 
 .form-field input:focus,
 .form-field select:focus {
-  outline: 2px solid var(--color-navy);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--color-navy);
+  box-shadow: 0 0 0 3px rgba(26, 43, 76, 0.12);
 }
 
 .btn-primary {
   background: var(--color-navy);
   color: #fff;
   border: none;
-  padding: 10px 20px;
+  padding: 11px 22px;
   border-radius: var(--radius);
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 2px rgba(16, 28, 51, 0.15);
 }
 
 .btn-primary:hover {
   background: var(--color-navy-dark);
+  box-shadow: 0 2px 6px rgba(16, 28, 51, 0.25);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-primary:disabled {
+  background: #9aa3b2;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .error-text {
