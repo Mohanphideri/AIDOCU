@@ -314,3 +314,23 @@ async function lockPaper(paperId, adminId) {
 }
 
 module.exports = { generatePaper, editPaper, analyzePaper, lockPaper };
+
+
+async function listPapers(filters = {}, pagination = {}) {
+  const { Paper, Exam } = require('../models');
+  const query = {};
+  if (filters.status) query.status = filters.status;
+  if (filters.universityId) {
+    const exams = await Exam.find({ universityId: filters.universityId }).select('_id').lean();
+    query.examId = { $in: exams.map(e => e._id) };
+  }
+  const page = Math.max(1, Number(pagination.page) || 1);
+  const limit = Math.min(Number(pagination.limit) || 25, 100);
+  const [items, total] = await Promise.all([
+    Paper.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate({ path: 'examId', select: 'subjectCode examType examDate status subjectId' }),
+    Paper.countDocuments(query),
+  ]);
+  return { items, total, page, limit };
+}
+
+module.exports.listPapers = listPapers;

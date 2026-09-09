@@ -5,7 +5,7 @@ async function list(req, res, next) {
   try {
     const { search, accountStatus, universityId, programmeId, departmentId, semesterId, page, limit } = req.query;
     const result = await studentAdminService.listStudents(
-      { search, accountStatus, universityId, programmeId, departmentId, semesterId },
+      { search, accountStatus, universityId: req.user.universityId, programmeId, departmentId, semesterId },
       { page: Number(page) || 1, limit: Number(limit) || 25 }
     );
     return success(res, result);

@@ -44,6 +44,7 @@ export const analyzePaper = (paperId) => apiClient.get(`/papers/${paperId}/analy
 export const lockPaper = (paperId) => apiClient.post(`/papers/${paperId}/lock`);
 
 // Translations
+export const listPapers = (params) => apiClient.get('/papers', { params });
 export const generateTranslations = (payload) => apiClient.post('/translations/generate', payload);
 export const listTranslationsForPaper = (paperId) => apiClient.get(`/translations/paper/${paperId}`);
 export const reviewTranslation = (translationId, payload) => apiClient.put(`/translations/${translationId}`, payload);

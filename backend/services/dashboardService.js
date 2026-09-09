@@ -6,7 +6,8 @@ const { Student, Exam, StudentQuery, ProctoringEvent, FacultyQuestionSubmission 
  * simple aggregate counts rather than heavy joins so this stays cheap to
  * call on every dashboard load.
  */
-async function getStats() {
+async function getStats(universityId) {
+  const scope = universityId ? { universityId } : {};
   const [
     totalStudents,
     activeStudents,
@@ -17,11 +18,11 @@ async function getStats() {
     proctoringAlerts,
     pendingFacultySubmissions,
   ] = await Promise.all([
-    Student.countDocuments({}),
-    Student.countDocuments({ accountStatus: 'ACTIVE' }),
-    Student.countDocuments({ accountStatus: 'PENDING_VERIFICATION' }),
-    Exam.countDocuments({ status: 'ACTIVE' }),
-    Exam.countDocuments({ status: 'SCHEDULED' }),
+    Student.countDocuments(scope),
+    Student.countDocuments({ ...scope, accountStatus: 'ACTIVE' }),
+    Student.countDocuments({ ...scope, accountStatus: 'PENDING_VERIFICATION' }),
+    Exam.countDocuments({ ...scope, status: 'ACTIVE' }),
+    Exam.countDocuments({ ...scope, status: 'SCHEDULED' }),
     StudentQuery.countDocuments({ status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }),
     ProctoringEvent.countDocuments({ reviewStatus: { $in: ['UNREVIEWED', 'REQUIRES_REVIEW'] } }),
     FacultyQuestionSubmission.countDocuments({ status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }),
@@ -44,7 +45,7 @@ async function getStats() {
  * "proctoring alerts" panel — separate from the count above so the
  * dashboard can show both a headline number and a quick preview.
  */
-async function getRecentProctoringAlerts(limit = 10) {
+async function getRecentProctoringAlerts(limit = 10, universityId) {
   return ProctoringEvent.find({ reviewStatus: { $in: ['UNREVIEWED', 'REQUIRES_REVIEW'] } })
     .sort({ serverTimestamp: -1 })
     .limit(limit)

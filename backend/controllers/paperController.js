@@ -2,6 +2,15 @@ const paperService = require('../services/paperService');
 const { ExamQuestion } = require('../models');
 const { success } = require('../utils/apiResponse');
 
+async function list(req, res, next) {
+  try {
+    const { page, limit, ...filters } = req.query;
+    filters.universityId = req.user.universityId;
+    const result = await paperService.listPapers(filters, { page: Number(page) || 1, limit: Number(limit) || 25 });
+    return success(res, result);
+  } catch (err) { return next(err); }
+}
+
 async function generate(req, res, next) {
   try {
     const { examId, blueprintId, mode, manualSelections } = req.body;
@@ -60,4 +69,4 @@ async function lock(req, res, next) {
   }
 }
 
-module.exports = { generate, edit, preview, analyze, lock };
+module.exports = { list, generate, edit, preview, analyze, lock };

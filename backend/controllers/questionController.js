@@ -3,7 +3,10 @@ const { success } = require('../utils/apiResponse');
 
 async function create(req, res, next) {
   try {
-    const question = await questionService.createQuestion(req.body, req.user.id);
+    // The authenticated admin is scoped to a university. Use that scope by default
+    // so the client never needs to manually supply the university ID.
+    const payload = { ...req.body, universityId: req.user.universityId || req.body.universityId };
+    const question = await questionService.createQuestion(payload, req.user.id);
     return success(res, question, 'Question created', 201);
   } catch (err) {
     return next(err);

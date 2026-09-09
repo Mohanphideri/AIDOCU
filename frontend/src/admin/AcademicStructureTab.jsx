@@ -1,173 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import * as adminApi from '../services/adminApiService';
 
-// One row of the academic hierarchy: University -> AcademicSession -> Faculty
-// -> Department -> Programme -> Semester -> Subject. Each level's create form
-// only enables once its parent has been selected, mirroring the spec's
-// hierarchy (section 4) and preventing orphaned records.
-const LEVELS = [
-  { key: 'universities', label: 'University', fields: [
-      { name: 'name', label: 'Name' },
-      { name: 'officialEmail', label: 'Official Email' },
-      { name: 'emailDomain', label: 'Student Email Domain (e.g. university.edu)' },
-      { name: 'address', label: 'Address', optional: true },
-      { name: 'contactNumber', label: 'Contact Number', optional: true },
-    ] },
-  { key: 'sessions', label: 'Academic Session', parent: 'universityId', parentLevel: 'universities', fields: [
-      { name: 'name', label: 'Name (e.g. 2025-2026)' },
-      { name: 'startDate', label: 'Start Date', type: 'date' },
-      { name: 'endDate', label: 'End Date', type: 'date' },
-    ] },
-  { key: 'faculties', label: 'Faculty / School', parent: 'universityId', parentLevel: 'universities', fields: [
-      { name: 'name', label: 'Name' },
-      { name: 'code', label: 'Code' },
-    ] },
-  { key: 'departments', label: 'Department', parent: 'facultyId', parentLevel: 'faculties', fields: [
-      { name: 'name', label: 'Name' },
-      { name: 'code', label: 'Code' },
-    ], carryUniversity: true },
-  { key: 'programmes', label: 'Programme', parent: 'departmentId', parentLevel: 'departments', fields: [
-      { name: 'name', label: 'Name' },
-      { name: 'code', label: 'Code' },
-      { name: 'durationSemesters', label: 'Duration (semesters)', type: 'number' },
-    ], carryUniversity: true },
-  { key: 'semesters', label: 'Semester', parent: 'programmeId', parentLevel: 'programmes', fields: [
-      { name: 'number', label: 'Semester Number', type: 'number' },
-    ], carryUniversity: true, needsSession: true },
-  { key: 'subjects', label: 'Subject', parent: 'semesterId', parentLevel: 'semesters', fields: [
-      { name: 'name', label: 'Name' },
-      { name: 'code', label: 'Subject Code' },
-    ], carryUniversity: true, needsProgramme: true },
+const LEVELS=[
+ {key:'universities',label:'University',icon:'U',fields:[['name','University name','text'],['officialEmail','Official email','email'],['emailDomain','Student email domain','text'],['address','Address','text'],['contactNumber','Contact number','text']]},
+ {key:'sessions',label:'Academic session',icon:'S',parent:'universities',parentField:'universityId',fields:[['name','Session name','text'],['startDate','Start date','date'],['endDate','End date','date']]},
+ {key:'faculties',label:'Faculty / School',icon:'F',parent:'universities',parentField:'universityId',fields:[['name','Faculty name','text'],['code','Code','text']]},
+ {key:'departments',label:'Department',icon:'D',parent:'faculties',parentField:'facultyId',fields:[['name','Department name','text'],['code','Code','text']]},
+ {key:'programmes',label:'Programme',icon:'P',parent:'departments',parentField:'departmentId',fields:[['name','Programme name','text'],['code','Programme code','text'],['durationSemesters','Duration (semesters)','number']]},
+ {key:'semesters',label:'Semester',icon:'2',parent:'programmes',parentField:'programmeId',needsSession:true,fields:[['number','Semester number','number']]},
+ {key:'subjects',label:'Subject',icon:'C',parent:'semesters',parentField:'semesterId',needsProgramme:true,fields:[['name','Subject name','text'],['code','Subject code','text']]},
 ];
-
-function LevelPanel({ level, allData, selected, onSelect, onCreated }) {
-  const [form, setForm] = useState({});
-  const [error, setError] = useState(null);
-  const items = allData[level.key] || [];
-
-  const parentId = level.parent ? selected[level.parentLevel] : null;
-  const filteredItems = level.parent
-    ? items.filter((item) => (item[level.parent]?._id || item[level.parent]) === parentId)
-    : items;
-
-  async function handleCreate(e) {
-    e.preventDefault();
-    setError(null);
-    try {
-      const payload = { ...form };
-      if (level.parent) payload[level.parent] = parentId;
-      if (level.carryUniversity) payload.universityId = selected.universities;
-      if (level.needsSession) payload.academicSessionId = selected.sessions;
-      if (level.needsProgramme) {
-        payload.programmeId = selected.programmes;
-      }
-      await adminApi.createAcademic(level.key, payload);
-      setForm({});
-      onCreated(level.key);
-    } catch (err) {
-      setError(err.message || `Could not create ${level.label}`);
-    }
-  }
-
-  const parentReady = !level.parent || Boolean(parentId);
-  const sessionReady = !level.needsSession || Boolean(selected.sessions);
-
-  return (
-    <div style={{ borderBottom: '1px solid var(--color-border)', padding: '16px 0' }}>
-      <h3>{level.label}</h3>
-      {!parentReady && (
-        <p style={{ color: 'var(--color-text-muted)' }}>
-          Select a {LEVELS.find((l) => l.key === level.parentLevel)?.label} above first.
-        </p>
-      )}
-      {parentReady && (
-        <>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            {filteredItems.map((item) => (
-              <button
-                key={item._id}
-                type="button"
-                className={selected[level.key] === item._id ? 'btn-primary' : 'btn-secondary'}
-                onClick={() => onSelect(level.key, item._id)}
-              >
-                {item.name || `#${item.number}` || item.code}
-              </button>
-            ))}
-            {!filteredItems.length && <span style={{ color: 'var(--color-text-muted)' }}>None yet.</span>}
-          </div>
-
-          {sessionReady && (
-            <form onSubmit={handleCreate} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              {level.fields.map((f) => (
-                <div className="form-field" key={f.name} style={{ minWidth: 160 }}>
-                  <label>{f.label}</label>
-                  <input
-                    type={f.type || 'text'}
-                    value={form[f.name] || ''}
-                    required={!f.optional}
-                    onChange={(e) => setForm({ ...form, [f.name]: e.target.value })}
-                  />
-                </div>
-              ))}
-              <button className="btn-primary" type="submit">Add {level.label}</button>
-            </form>
-          )}
-          {level.needsSession && !selected.sessions && (
-            <p style={{ color: 'var(--color-text-muted)' }}>Select an Academic Session above to add a Semester.</p>
-          )}
-          {error && <div className="error-text">{error}</div>}
-        </>
-      )}
-    </div>
-  );
-}
-
-export default function AcademicStructureTab() {
-  const [allData, setAllData] = useState({});
-  const [selected, setSelected] = useState({});
-  const [error, setError] = useState(null);
-
-  const loadOne = useCallback((key) => {
-    adminApi
-      .listAcademic(key)
-      .then((res) => setAllData((prev) => ({ ...prev, [key]: res.data || [] })))
-      .catch((err) => setError(err.message));
-  }, []);
-
-  useEffect(() => {
-    LEVELS.forEach((l) => loadOne(l.key));
-  }, [loadOne]);
-
-  function handleSelect(levelKey, id) {
-    setSelected((prev) => {
-      const next = { ...prev, [levelKey]: id };
-      // Selecting a level resets any deeper selections so dependent lists
-      // (and create forms) stay consistent with the chosen parent.
-      const idx = LEVELS.findIndex((l) => l.key === levelKey);
-      LEVELS.slice(idx + 1).forEach((l) => delete next[l.key]);
-      return next;
-    });
-  }
-
-  return (
-    <div>
-      <h2>Academic Structure</h2>
-      <p style={{ color: 'var(--color-text-muted)' }}>
-        Build the hierarchy top-down: University → Academic Session / Faculty → Department →
-        Programme → Semester → Subject. Subjects created here become selectable when creating an
-        examination.
-      </p>
-      {error && <div className="error-text">{error}</div>}
-      {LEVELS.map((level) => (
-        <LevelPanel
-          key={level.key}
-          level={level}
-          allData={allData}
-          selected={selected}
-          onSelect={handleSelect}
-          onCreated={loadOne}
-        />
-      ))}
-    </div>
-  );
-}
+function id(x){return x?._id||x}
+function display(item,key){if(key==='semesters')return `Semester ${item.number}`;return item.code?`${item.code} — ${item.name}`:item.name}
+export default function AcademicStructureTab(){const[data,setData]=useState({});const[sel,setSel]=useState({});const[form,setForm]=useState({});const[error,setError]=useState(null);const[msg,setMsg]=useState(null);const[loading,setLoading]=useState(true);
+ const load=useCallback(async()=>{setLoading(true);setError(null);try{const rows=await Promise.all(LEVELS.map(l=>adminApi.listAcademic(l.key).then(r=>[l.key,r.data||[]])));setData(Object.fromEntries(rows))}catch(e){setError(e.message||'Could not load academic structure')}finally{setLoading(false)}},[]);useEffect(()=>{load()},[load]);
+ function select(key,value){const idx=LEVELS.findIndex(x=>x.key===key);const next={...sel,[key]:value};LEVELS.slice(idx+1).forEach(x=>delete next[x.key]);setSel(next)}
+ const currentUniversity=sel.universities;const selectedPath=LEVELS.filter(x=>sel[x.key]).map(x=>{const item=(data[x.key]||[]).find(y=>y._id===sel[x.key]);return item?display(item,x.key):''}).filter(Boolean);
+ function filtered(l){const items=data[l.key]||[];if(!l.parent)return items;if(!sel[l.parent])return[];return items.filter(item=>id(item[l.parentField])===sel[l.parent])}
+ async function create(e,l){e.preventDefault();setError(null);setMsg(null);try{const payload={...form};if(l.parent)payload[l.parentField]=sel[l.parent];if(l.key!=='universities')payload.universityId=currentUniversity;if(l.needsSession)payload.academicSessionId=sel.sessions;if(l.needsProgramme)payload.programmeId=sel.programmes;await adminApi.createAcademic(l.key,payload);setForm({});setMsg(`${l.label} created successfully.`);await load()}catch(e){setError(e.message||`Could not create ${l.label}`)}}
+ return <div className="admin-section"><div className="section-toolbar"><div><div className="eyebrow">Academic master data</div><h2>Academic structure</h2><p>Set up the hierarchy once. Every exam, question and student workflow reuses these records.</p></div><button className="btn-secondary" onClick={load}>↻ Refresh</button></div>{error&&<div className="alert alert-error">{error}</div>}{msg&&<div className="alert alert-success">{msg}</div>}
+ <div className="structure-path"><span>Current path</span><b>{selectedPath.length?selectedPath.join('  /  '):'Select a university to begin'}</b></div>
+ <div className="structure-layout"><div className="structure-steps">{LEVELS.map((l,idx)=>{const parentReady=!l.parent||sel[l.parent];const items=filtered(l);return <section className={`structure-step ${sel[l.key]?'selected':''} ${!parentReady?'disabled':''}`} key={l.key}><div className="step-title"><span className="step-number">{idx+1}</span><div><h3>{l.label}</h3><small>{items.length} available</small></div></div>{parentReady&&<div className="choice-list">{items.map(item=><button className={sel[l.key]===item._id?'choice active':'choice'} key={item._id} onClick={()=>select(l.key,item._id)}>{display(item,l.key)}<span>›</span></button>)}{!items.length&&<div className="mini-empty">No {l.label.toLowerCase()} records yet.</div>}</div>}{!parentReady&&<div className="mini-empty">Select the parent step first.</div>}{parentReady&&<form className="inline-create" onSubmit={e=>create(e,l)}>{l.fields.map(([name,label,type])=><div className="admin-field compact" key={name}><label>{label}</label><input type={type} value={form[name]||''} required={name!=='address'&&name!=='contactNumber'} onChange={e=>setForm({...form,[name]:e.target.value})}/></div>)}<button className="btn-secondary" type="submit">+ Add {l.label}</button></form>}</section>})}</div><aside className="structure-side panel"><h3>How the structure works</h3><p>Use the left side from top to bottom. Selecting a parent automatically filters the next level.</p><div className="hierarchy">{LEVELS.map((l,i)=><div key={l.key}><span>{l.icon}</span><b>{l.label}</b>{i<LEVELS.length-1&&<em>↓</em>}</div>)}</div><div className="info-note"><b>No IDs needed</b><span>Database IDs are generated and linked automatically. Admin forms should never ask you to paste ObjectIds.</span></div></aside></div>
+ </div>}
