@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { loginStudent } from '../services/studentAuthService';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,7 +19,10 @@ export default function LoginPage() {
     try {
       const res = await loginStudent({ uid, password });
       login(res.data.student);
-      navigate('/dashboard');
+      const redirectTo = location.state?.from?.pathname
+        ? `${location.state.from.pathname}${location.state.from.search || ''}`
+        : '/dashboard';
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {
@@ -33,6 +36,9 @@ export default function LoginPage() {
 
       {location.state?.justVerified && (
         <div className="success-banner">Your email has been verified. You may now log in.</div>
+      )}
+      {location.state?.justReset && (
+        <div className="success-banner">Your password has been reset. You may now log in.</div>
       )}
       {error && <div className="error-text">{error}</div>}
 
@@ -51,7 +57,7 @@ export default function LoginPage() {
       </form>
 
       <p>
-        <a href="/forgot-password">Forgot password?</a>
+        <Link to="/forgot-password">Forgot password?</Link>
       </p>
     </div>
   );

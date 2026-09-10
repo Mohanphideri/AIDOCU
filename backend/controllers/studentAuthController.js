@@ -5,6 +5,7 @@ const { signToken } = require('../utils/jwt');
 const { success, error } = require('../utils/apiResponse');
 const { ApiError } = require('../middleware/errorHandler');
 const auditService = require('../services/auditService');
+const passwordResetService = require('../services/passwordResetService');
 
 async function listUniversitiesPublic(req, res, next) {
   try {
@@ -94,4 +95,43 @@ async function login(req, res, next) {
   }
 }
 
-module.exports = { listUniversitiesPublic, register, verifyEmail, resendVerification, login };
+async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body;
+    await passwordResetService.requestPasswordReset({ role: 'STUDENT', email });
+    // Always the same response, whether or not the email matched an account.
+    return success(res, {}, 'If that email is registered, a password reset link has been sent.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const { token, password } = req.body;
+    await passwordResetService.resetPassword({ role: 'STUDENT', token, newPassword: password });
+    return success(res, {}, 'Your password has been reset. You may now log in.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function me(req, res, next) {
+  try {
+    const profile = await studentService.getStudentProfile(req.user.id);
+    return success(res, profile);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = {
+  listUniversitiesPublic,
+  register,
+  verifyEmail,
+  resendVerification,
+  login,
+  forgotPassword,
+  resetPassword,
+  me,
+};

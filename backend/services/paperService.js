@@ -320,7 +320,10 @@ async function listPapers(filters = {}, pagination = {}) {
   const { Paper, Exam } = require('../models');
   const query = {};
   if (filters.status) query.status = filters.status;
-  if (filters.universityId) {
+  if (filters.blueprintId) query.blueprintId = filters.blueprintId;
+  if (filters.examId) {
+    query.examId = filters.examId;
+  } else if (filters.universityId) {
     const exams = await Exam.find({ universityId: filters.universityId }).select('_id').lean();
     query.examId = { $in: exams.map(e => e._id) };
   }

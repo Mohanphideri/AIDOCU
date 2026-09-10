@@ -110,6 +110,33 @@ async function sendResultPublicationEmail({ to, studentId, examId, resultId, exa
   });
 }
 
+/**
+ * Sent to eligible students the moment an exam goes ACTIVE — never before.
+ * Exam creation and scheduling are deliberately silent; the exam isn't
+ * actually joinable until it's ACTIVE, so notifying earlier would just
+ * generate "why can't I start it yet" confusion/support load.
+ */
+async function sendExamActiveEmail({ to, studentId, examId, examName, universityName, startTime, endTime, durationMinutes, examPortalUrl }) {
+  return sendEmail({
+    to,
+    type: 'EXAM_ACTIVE',
+    studentId,
+    examId,
+    subject: `${universityName} — ${examName} is now live`,
+    htmlContent: `
+      <p><strong>${examName}</strong> is now open for you to take.</p>
+      <p>
+        Start: ${new Date(startTime).toLocaleString()}<br/>
+        End: ${new Date(endTime).toLocaleString()}<br/>
+        Duration: ${durationMinutes} minutes
+      </p>
+      <p><a href="${examPortalUrl}">Click here to go straight to this exam</a></p>
+      <p>If you are not already logged in, this link will take you to login first and then send you straight into the exam automatically.</p>
+      <p>Log in with your UID and password well before the end time — once the exam window closes you will not be able to start or resume it.</p>
+    `,
+  });
+}
+
 async function retryFailedEmail(emailLogId) {
   const log = await EmailLog.findById(emailLogId);
   if (!log || log.status !== 'FAILED') return null;
@@ -126,5 +153,6 @@ module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendResultPublicationEmail,
+  sendExamActiveEmail,
   retryFailedEmail,
 };

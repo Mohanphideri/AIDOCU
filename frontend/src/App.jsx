@@ -8,6 +8,8 @@ import StaffProtectedRoute from './routes/StaffProtectedRoute';
 import RegisterPage from './student/RegisterPage';
 import VerifyEmailPage from './student/VerifyEmailPage';
 import LoginPage from './student/LoginPage';
+import ForgotPasswordPage from './student/ForgotPasswordPage';
+import ResetPasswordPage from './student/ResetPasswordPage';
 import DashboardPage from './student/DashboardPage';
 import PreExamSecurityPage from './student/PreExamSecurityPage';
 import ExamPage from './student/ExamPage';
@@ -16,7 +18,19 @@ import ResultPage from './student/ResultPage';
 import QueriesPage from './student/QueriesPage';
 
 import StaffLoginPage from './auth/StaffLoginPage';
-import { loginAdmin, loginFaculty, loginSupervisor } from './services/staffAuthService';
+import StaffForgotPasswordPage from './auth/StaffForgotPasswordPage';
+import StaffResetPasswordPage from './auth/StaffResetPasswordPage';
+import {
+  loginAdmin,
+  loginFaculty,
+  loginSupervisor,
+  forgotPasswordAdmin,
+  forgotPasswordFaculty,
+  forgotPasswordSupervisor,
+  resetPasswordAdmin,
+  resetPasswordFaculty,
+  resetPasswordSupervisor,
+} from './services/staffAuthService';
 import AdminDashboardPage from './admin/AdminDashboardPage';
 import FacultySubmissionPage from './faculty/FacultySubmissionPage';
 import SupervisorDashboardPage from './supervisor/SupervisorDashboardPage';
@@ -33,6 +47,8 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
           <Route
             path="/dashboard"
             element={
@@ -85,7 +101,22 @@ export default function App() {
           {/* Admin */}
           <Route
             path="/admin/login"
-            element={<StaffLoginPage title="Admin Login" loginFn={loginAdmin} redirectTo="/admin/dashboard" />}
+            element={<StaffLoginPage title="Admin Login" loginFn={loginAdmin} redirectTo="/admin/dashboard" forgotPasswordPath="/admin/forgot-password" />}
+          />
+          <Route
+            path="/admin/forgot-password"
+            element={<StaffForgotPasswordPage title="Admin — Forgot Password" forgotPasswordFn={forgotPasswordAdmin} loginPath="/admin/login" />}
+          />
+          <Route
+            path="/admin/reset-password/:token"
+            element={
+              <StaffResetPasswordPage
+                title="Admin — Reset Password"
+                resetPasswordFn={resetPasswordAdmin}
+                loginPath="/admin/login"
+                forgotPasswordPath="/admin/forgot-password"
+              />
+            }
           />
           <Route
             path="/admin/dashboard"
@@ -99,7 +130,22 @@ export default function App() {
           {/* Faculty */}
           <Route
             path="/faculty/login"
-            element={<StaffLoginPage title="Faculty Login" loginFn={loginFaculty} redirectTo="/faculty/dashboard" />}
+            element={<StaffLoginPage title="Faculty Login" loginFn={loginFaculty} redirectTo="/faculty/dashboard" forgotPasswordPath="/faculty/forgot-password" />}
+          />
+          <Route
+            path="/faculty/forgot-password"
+            element={<StaffForgotPasswordPage title="Faculty — Forgot Password" forgotPasswordFn={forgotPasswordFaculty} loginPath="/faculty/login" />}
+          />
+          <Route
+            path="/faculty/reset-password/:token"
+            element={
+              <StaffResetPasswordPage
+                title="Faculty — Reset Password"
+                resetPasswordFn={resetPasswordFaculty}
+                loginPath="/faculty/login"
+                forgotPasswordPath="/faculty/forgot-password"
+              />
+            }
           />
           <Route
             path="/faculty/dashboard"
@@ -113,7 +159,22 @@ export default function App() {
           {/* Supervisor */}
           <Route
             path="/supervisor/login"
-            element={<StaffLoginPage title="Supervisor Login" loginFn={loginSupervisor} redirectTo="/supervisor/dashboard" />}
+            element={<StaffLoginPage title="Supervisor Login" loginFn={loginSupervisor} redirectTo="/supervisor/dashboard" forgotPasswordPath="/supervisor/forgot-password" />}
+          />
+          <Route
+            path="/supervisor/forgot-password"
+            element={<StaffForgotPasswordPage title="Supervisor — Forgot Password" forgotPasswordFn={forgotPasswordSupervisor} loginPath="/supervisor/login" />}
+          />
+          <Route
+            path="/supervisor/reset-password/:token"
+            element={
+              <StaffResetPasswordPage
+                title="Supervisor — Reset Password"
+                resetPasswordFn={resetPasswordSupervisor}
+                loginPath="/supervisor/login"
+                forgotPasswordPath="/supervisor/forgot-password"
+              />
+            }
           />
           <Route
             path="/supervisor/dashboard"

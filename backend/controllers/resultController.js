@@ -14,6 +14,15 @@ async function getMyResult(req, res, next) {
   }
 }
 
+async function listMine(req, res, next) {
+  try {
+    const results = await resultService.listResultsForStudent(req.user.id);
+    return success(res, results);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function finalizeResult(req, res, next) {
   try {
     const result = await resultService.finalizeResult({ resultId: req.params.resultId, adminId: req.user.id });
@@ -73,4 +82,4 @@ async function listForExam(req, res, next) {
   }
 }
 
-module.exports = { getMyResult, finalizeResult, correctResult, publishResults, listForExam };
+module.exports = { getMyResult, listMine, finalizeResult, correctResult, publishResults, listForExam };

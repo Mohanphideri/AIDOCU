@@ -25,6 +25,18 @@ export function loginStudent({ uid, password }) {
   });
 }
 
+export function getMyProfile() {
+  return apiClient.get('/auth/student/me');
+}
+
 export function logout() {
   localStorage.removeItem('cbt_token');
+}
+
+export function forgotPassword({ email }) {
+  return apiClient.post('/auth/student/forgot-password', { email });
+}
+
+export function resetPassword({ token, password, confirmPassword }) {
+  return apiClient.post('/auth/student/reset-password', { token, password, confirmPassword });
 }

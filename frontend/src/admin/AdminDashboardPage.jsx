@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as adminApi from '../services/adminApiService';
+import { logoutStaff } from '../services/staffAuthService';
 import AcademicStructureTab from './AcademicStructureTab';
 import EligibilityTab from './EligibilityTab';
 import PapersTab from './PapersTab';
@@ -9,11 +11,14 @@ import QueriesTab from './QueriesTab';
 import AuditLogTab from './AuditLogTab';
 import DashboardTab from './DashboardTab';
 import StudentsTab from './StudentsTab';
+import QuestionBankTab from './QuestionBankTab';
+import ExamWorkspace from './ExamWorkspace';
+import { getId, labelForSubject, dateTime, EXAM_TYPES, SmartSelect } from './adminHelpers';
 
 const NAV_GROUPS = [
   { label: 'Overview', items: [{ key: 'Dashboard', icon: '▦' }] },
   { label: 'Examination', items: [
-    { key: 'Exams', icon: '◫' }, { key: 'Eligibility', icon: '✓' },
+    { key: 'Exam Workspace', icon: '★' }, { key: 'Exams', icon: '◫' }, { key: 'Eligibility', icon: '✓' },
     { key: 'Blueprint & Papers', icon: '▤' }, { key: 'Results', icon: '◉' },
   ]},
   { label: 'Academic & Content', items: [
@@ -24,26 +29,6 @@ const NAV_GROUPS = [
     { key: 'Students', icon: '♙' }, { key: 'Queries', icon: '⚑' }, { key: 'Audit Log', icon: '≡' },
   ]},
 ];
-
-const EXAM_TYPES = [
-  ['MID_SEM', 'Mid-Semester'], ['END_SEM', 'End-Semester'], ['QUIZ', 'Quiz'],
-  ['PRACTICAL', 'Practical'], ['INTERNAL', 'Internal Assessment'],
-];
-
-function getId(value) { return value?._id || value; }
-function labelForSubject(s) { return `${s.code} — ${s.name}`; }
-function dateTime(date, time) {
-  if (!date || !time) return '';
-  return `${date}T${time}`;
-}
-
-function SmartSelect({ label, value, onChange, children, hint, required = true }) {
-  return <div className="admin-field">
-    <label>{label}{required && <span className="required">*</span>}</label>
-    <select value={value} onChange={onChange} required={required}>{children}</select>
-    {hint && <small>{hint}</small>}
-  </div>;
-}
 
 function ExamsTab() {
   const [exams, setExams] = useState([]);
@@ -144,4 +129,90 @@ function QuestionBankTab() {
 
 function FacultySubmissionsTab(){const [items,setItems]=useState([]),[error,setError]=useState(null);const load=useCallback(()=>adminApi.listFacultySubmissions().then(r=>setItems(r.data||[])).catch(e=>setError(e.message)),[]);useEffect(()=>{load()},[load]);return <div className="admin-section"><div className="section-toolbar"><div><div className="eyebrow">Faculty workflow</div><h2>Faculty submissions</h2><p>Review faculty-authored questions before they enter the approved question bank.</p></div><button className="btn-secondary" onClick={load}>↻ Refresh</button></div>{error&&<div className="alert alert-error">{error}</div>}<section className="panel table-panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Question</th><th>Faculty</th><th>Status</th><th>Action</th></tr></thead><tbody>{items.map(s=><tr key={s._id}><td><strong>{s.questionText}</strong></td><td>{s.facultyMemberId?.name||'—'}</td><td><span className="status status-neutral">{s.status}</span></td><td>{['SUBMITTED','UNDER_REVIEW'].includes(s.status)&&<div className="action-row"><button className="link-btn" onClick={async()=>{try{await adminApi.approveFacultySubmission(s._id,{universityId:s.universityId,autoApproveInBank:true});load()}catch(e){setError(e.message)}}}>Approve</button><button className="link-btn danger" onClick={async()=>{try{await adminApi.rejectFacultySubmission(s._id,'Not suitable');load()}catch(e){setError(e.message)}}}>Reject</button></div>}</td></tr>)}{!items.length&&<tr><td colSpan="4"><div className="empty-state"><b>No pending submissions</b><span>Faculty questions will appear here for review.</span></div></td></tr>}</tbody></table></div></section></div>}
 
-export default function AdminDashboardPage(){const [activeTab,setActiveTab]=useState('Dashboard');const [collapsed,setCollapsed]=useState(false);const activeLabel=activeTab;return <div className={`admin-shell ${collapsed?'sidebar-collapsed':''}`}><aside className="admin-sidebar"><div className="brand"><div className="brand-mark">U</div><div className="brand-copy"><strong>UniExam</strong><span>Administration</span></div><button className="collapse-btn" onClick={()=>setCollapsed(!collapsed)}>{collapsed?'›':'‹'}</button></div><div className="sidebar-scroll">{NAV_GROUPS.map(g=><div className="nav-group" key={g.label}><div className="admin-sidebar-title">{g.label}</div>{g.items.map(i=><button title={i.key} key={i.key} className={`admin-nav-item ${activeTab===i.key?'active':''}`} onClick={()=>setActiveTab(i.key)}><span className="admin-nav-icon">{i.icon}</span><span className="nav-label">{i.key}</span></button>)}</div>)}</div><div className="sidebar-footer"><div className="avatar">A</div><div className="nav-label"><strong>Administrator</strong><span>University Admin</span></div></div></aside><main className="admin-main"><header className="admin-topbar"><div><div className="breadcrumb">Administration / {activeLabel}</div><h1>{activeLabel}</h1></div><div className="top-actions"><span className="secure-pill">● System secure</span><button className="icon-btn" title="Refresh page" onClick={()=>window.location.reload()}>↻</button></div></header><div className="admin-content">{activeTab==='Dashboard'&&<DashboardTab/>}{activeTab==='Exams'&&<ExamsTab/>}{activeTab==='Academic Structure'&&<AcademicStructureTab/>}{activeTab==='Eligibility'&&<EligibilityTab/>}{activeTab==='Students'&&<StudentsTab/>}{activeTab==='Question Bank'&&<QuestionBankTab/>}{activeTab==='Faculty Submissions'&&<FacultySubmissionsTab/>}{activeTab==='Blueprint & Papers'&&<PapersTab/>}{activeTab==='Translations'&&<TranslationsTab/>}{activeTab==='Results'&&<ResultsTab/>}{activeTab==='Queries'&&<QueriesTab/>}{activeTab==='Audit Log'&&<AuditLogTab/>}</div></main></div>}
+export default function AdminDashboardPage() {
+  const [activeTab, setActiveTab] = useState('Exam Workspace');
+  const [collapsed, setCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const activeLabel = activeTab;
+
+  function handleLogout() {
+    logoutStaff();
+    navigate('/admin/login');
+  }
+
+  return (
+    <div className={`admin-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
+      <aside className="admin-sidebar">
+        <div className="brand">
+          <div className="brand-mark">U</div>
+          <div className="brand-copy">
+            <strong>UniExam</strong>
+            <span>Administration</span>
+          </div>
+          <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>{collapsed ? '›' : '‹'}</button>
+        </div>
+        <div className="sidebar-scroll">
+          {NAV_GROUPS.map((g) => (
+            <div className="nav-group" key={g.label}>
+              <div className="admin-sidebar-title">{g.label}</div>
+              {g.items.map((i) => (
+                <button
+                  title={i.key}
+                  key={i.key}
+                  className={`admin-nav-item ${activeTab === i.key ? 'active' : ''}`}
+                  onClick={() => setActiveTab(i.key)}
+                >
+                  <span className="admin-nav-icon">{i.icon}</span>
+                  <span className="nav-label">{i.key}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="sidebar-footer">
+          <div className="avatar">A</div>
+          <div className="nav-label">
+            <strong>Administrator</strong>
+            <span>University Admin</span>
+          </div>
+          <button
+            className="icon-btn"
+            title="Logout"
+            onClick={handleLogout}
+            style={{ marginLeft: 'auto' }}
+          >
+            ⏻
+          </button>
+        </div>
+      </aside>
+      <main className="admin-main">
+        <header className="admin-topbar">
+          <div>
+            <div className="breadcrumb">Administration / {activeLabel}</div>
+            <h1>{activeLabel}</h1>
+          </div>
+          <div className="top-actions">
+            <span className="secure-pill">● System secure</span>
+            <button className="icon-btn" title="Refresh page" onClick={() => window.location.reload()}>↻</button>
+            <button className="btn-secondary" onClick={handleLogout}>Logout</button>
+          </div>
+        </header>
+        <div className="admin-content">
+          {activeTab === 'Dashboard' && <DashboardTab />}
+          {activeTab === 'Exam Workspace' && <ExamWorkspace />}
+          {activeTab === 'Exams' && <ExamsTab />}
+          {activeTab === 'Academic Structure' && <AcademicStructureTab />}
+          {activeTab === 'Eligibility' && <EligibilityTab />}
+          {activeTab === 'Students' && <StudentsTab />}
+          {activeTab === 'Question Bank' && <QuestionBankTab />}
+          {activeTab === 'Faculty Submissions' && <FacultySubmissionsTab />}
+          {activeTab === 'Blueprint & Papers' && <PapersTab />}
+          {activeTab === 'Translations' && <TranslationsTab />}
+          {activeTab === 'Results' && <ResultsTab />}
+          {activeTab === 'Queries' && <QueriesTab />}
+          {activeTab === 'Audit Log' && <AuditLogTab />}
+        </div>
+      </main>
+    </div>
+  );
+}

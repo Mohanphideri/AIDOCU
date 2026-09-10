@@ -131,4 +131,31 @@ async function verifyEmail({ studentId, code }) {
   return student;
 }
 
-module.exports = { registerStudent, issueVerificationCode, verifyEmail };
+/**
+ * Full profile for the student dashboard header: name, uid, university,
+ * and current semester/programme. Populated fresh on every dashboard load
+ * (rather than trusting the login-time JWT payload) so it reflects any
+ * admin-side changes (e.g. a semester promotion) without requiring re-login.
+ */
+async function getStudentProfile(studentId) {
+  const student = await Student.findById(studentId)
+    .populate('universityId', 'name')
+    .populate('programmeId', 'name code')
+    .populate('semesterId', 'number')
+    .populate('departmentId', 'name code');
+
+  if (!student) throw new ApiError('Student not found', 404, 'NOT_FOUND');
+
+  return {
+    id: student._id,
+    name: student.name,
+    uid: student.uid,
+    universityEmail: student.universityEmail,
+    university: student.universityId ? { id: student.universityId._id, name: student.universityId.name } : null,
+    department: student.departmentId ? { id: student.departmentId._id, name: student.departmentId.name, code: student.departmentId.code } : null,
+    programme: student.programmeId ? { id: student.programmeId._id, name: student.programmeId.name, code: student.programmeId.code } : null,
+    semester: student.semesterId ? { id: student.semesterId._id, number: student.semesterId.number } : null,
+  };
+}
+
+module.exports = { registerStudent, issueVerificationCode, verifyEmail, getStudentProfile };

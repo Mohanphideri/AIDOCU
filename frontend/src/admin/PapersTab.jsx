@@ -9,15 +9,18 @@ const MODES = [
   { value: 'HYBRID', label: 'Hybrid', help: 'You pick some questions per section; the rest are filled automatically.' },
 ];
 
+const DEFAULT_SECTIONS = [{ name: 'Section A', questionCount: 5, marksPerQuestion: 1 }];
+
 // Blueprint -> Generate Paper (Automatic/Manual/Hybrid) -> Edit -> Preview -> Analyze -> Lock.
 // A locked paper is immutable; this UI intentionally does not offer an "unlock" action.
-export default function PapersTab() {
+export default function PapersTab({ initialExamId } = {}) {
   const [exams, setExams] = useState([]);
-  const [examId, setExamId] = useState('');
-  const [sections, setSections] = useState([
-    { name: 'Section A', questionCount: 5, marksPerQuestion: 1 },
-  ]);
+  const [examId, setExamId] = useState(initialExamId || '');
+  const [sections, setSections] = useState(DEFAULT_SECTIONS);
   const [blueprint, setBlueprint] = useState(null);
+  const [blueprintLoading, setBlueprintLoading] = useState(false);
+  const [blueprintLocked, setBlueprintLocked] = useState(false);
+  const [savingBlueprint, setSavingBlueprint] = useState(false);
   const [mode, setMode] = useState('AUTOMATIC');
   const [manualSelections, setManualSelections] = useState({});
 
@@ -41,31 +44,75 @@ export default function PapersTab() {
     loadExams();
   }, [loadExams]);
 
+  useEffect(() => {
+    if (initialExamId) resetForNewExam(initialExamId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialExamId]);
+
   function resetForNewExam(id) {
     setExamId(id);
     setBlueprint(null);
+    setBlueprintLocked(false);
+    setSections(DEFAULT_SECTIONS);
     setPaper(null);
     setExamQuestions(null);
     setAnalysis(null);
     setMissing(null);
     setManualSelections({});
     setShowPreview(false);
+    setError(null);
+    setMessage(null);
+    if (id) loadBlueprintForExam(id);
+  }
+
+  async function loadBlueprintForExam(id) {
+    setBlueprintLoading(true);
+    try {
+      const res = await adminApi.getBlueprintByExam(id);
+      if (res.data) {
+        setBlueprint(res.data);
+        setSections(res.data.sections);
+
+        const lockedPapers = await adminApi.listPapers({ blueprintId: res.data._id, status: 'LOCKED' });
+        setBlueprintLocked((lockedPapers.data.items || []).length > 0);
+      } else {
+        setBlueprint(null);
+        setSections(DEFAULT_SECTIONS);
+        setBlueprintLocked(false);
+      }
+    } catch (err) {
+      setError(err.message || 'Could not load the blueprint for this exam');
+    } finally {
+      setBlueprintLoading(false);
+    }
   }
 
   function updateSection(idx, patch) {
     setSections((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
   }
 
-  async function handleCreateBlueprint(e) {
+  async function handleSaveBlueprint(e) {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    setSavingBlueprint(true);
     try {
-      const bp = await adminApi.createBlueprint({ examId, sections });
-      setBlueprint(bp.data);
-      setMessage('Blueprint created.');
+      if (blueprint && blueprint._id) {
+        const res = await adminApi.updateBlueprint(blueprint._id, sections);
+        setBlueprint(res.data);
+        setMessage('Blueprint updated.');
+      } else {
+        const res = await adminApi.createBlueprint({ examId, sections });
+        setBlueprint(res.data);
+        setMessage('Blueprint created.');
+      }
     } catch (err) {
-      setError(err.message || 'Could not create blueprint');
+      if (err.code === 'BLUEPRINT_LOCKED') {
+        setBlueprintLocked(true);
+      }
+      setError(err.message || 'Could not save blueprint');
+    } finally {
+      setSavingBlueprint(false);
     }
   }
 
@@ -208,7 +255,13 @@ export default function PapersTab() {
 
       {examId && (
         <>
-          <h3>1. Blueprint sections</h3>
+          <h3>1. Blueprint sections {blueprint && <span style={{ fontWeight: 400, fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>(editing existing blueprint)</span>}</h3>
+          {blueprintLoading && <p style={{ color: 'var(--color-text-muted)' }}>Loading blueprint…</p>}
+          {blueprintLocked && (
+            <div className="warning-banner">
+              This blueprint is locked to a generated, locked paper and can no longer be edited.
+            </div>
+          )}
           <p style={{ color: 'var(--color-text-muted)' }}>
             Define how many questions and marks each section contributes. Unit / topic / difficulty
             distribution percentages can be added via the API for finer control; this form covers
@@ -216,19 +269,21 @@ export default function PapersTab() {
           </p>
           {sections.map((s, idx) => (
             <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <input placeholder="Section name" value={s.name} onChange={(e) => updateSection(idx, { name: e.target.value })} />
-              <input type="number" placeholder="Question count" value={s.questionCount} onChange={(e) => updateSection(idx, { questionCount: Number(e.target.value) })} />
-              <input type="number" placeholder="Marks per question" value={s.marksPerQuestion} onChange={(e) => updateSection(idx, { marksPerQuestion: Number(e.target.value) })} />
+              <input placeholder="Section name" value={s.name} disabled={blueprintLocked} onChange={(e) => updateSection(idx, { name: e.target.value })} />
+              <input type="number" placeholder="Question count" value={s.questionCount} disabled={blueprintLocked} onChange={(e) => updateSection(idx, { questionCount: Number(e.target.value) })} />
+              <input type="number" placeholder="Marks per question" value={s.marksPerQuestion} disabled={blueprintLocked} onChange={(e) => updateSection(idx, { marksPerQuestion: Number(e.target.value) })} />
             </div>
           ))}
-          <button type="button" className="btn-secondary" onClick={() => setSections([...sections, { name: `Section ${String.fromCharCode(65 + sections.length)}`, questionCount: 5, marksPerQuestion: 1 }])}>
+          <button type="button" className="btn-secondary" disabled={blueprintLocked} onClick={() => setSections([...sections, { name: `Section ${String.fromCharCode(65 + sections.length)}`, questionCount: 5, marksPerQuestion: 1 }])}>
             + Add Section
           </button>
           <div style={{ marginTop: 10 }}>
-            <button type="button" className="btn-primary" onClick={handleCreateBlueprint}>Save Blueprint</button>
+            <button type="button" className="btn-primary" disabled={blueprintLocked || savingBlueprint} onClick={handleSaveBlueprint}>
+              {savingBlueprint ? 'Saving…' : blueprint ? 'Update Blueprint' : 'Save Blueprint'}
+            </button>
           </div>
 
-          {blueprint && !paper && (
+          {blueprint && !paper && !blueprintLocked && (
             <>
               <h3>2. Generate paper</h3>
               <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>

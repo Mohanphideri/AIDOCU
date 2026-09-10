@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-const EMAIL_TYPES = ['VERIFICATION', 'PASSWORD_RESET', 'RESULT_PUBLICATION'];
+const EMAIL_TYPES = ['VERIFICATION', 'PASSWORD_RESET', 'RESULT_PUBLICATION', 'EXAM_ACTIVE'];
 const EMAIL_STATUSES = ['QUEUED', 'SENT', 'FAILED'];
 
 const EmailLogSchema = new Schema(

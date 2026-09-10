@@ -24,6 +24,7 @@ export const recordProctoringEvent = (attemptId, examId, type, metadata = {}) =>
   });
 
 export const getMyResult = (resultId) => apiClient.get(`/results/${resultId}`);
+export const listMyResults = () => apiClient.get('/results');
 
 // Student queries (file a query about a question, and check its status)
 export const listMyQueries = (attemptId) => apiClient.get(`/attempts/${attemptId}/queries`);

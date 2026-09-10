@@ -2,6 +2,7 @@ import apiClient from '../api/client';
 
 // Exams
 export const listExams = (params) => apiClient.get('/exams', { params });
+export const getExam = (examId) => apiClient.get(`/exams/${examId}`);
 export const createExam = (payload) => apiClient.post('/exams', payload);
 export const scheduleExam = (examId) => apiClient.post(`/exams/${examId}/schedule`);
 export const transitionExam = (examId, targetStatus) => apiClient.post(`/exams/${examId}/transition`, { targetStatus });
@@ -25,8 +26,17 @@ export const removeEligibleStudent = (examId, studentId) =>
 // Question bank
 export const searchQuestions = (params) => apiClient.get('/questions', { params });
 export const createQuestion = (payload) => apiClient.post('/questions', payload);
+export const updateQuestion = (questionId, payload) => apiClient.put(`/questions/${questionId}`, payload);
 export const approveQuestion = (questionId) => apiClient.post(`/questions/${questionId}/approve`);
 export const rejectQuestion = (questionId, notes) => apiClient.post(`/questions/${questionId}/reject`, { notes });
+export const previewQuestionImport = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiClient.post('/questions/import/preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+export const importQuestions = (payload) => apiClient.post('/questions/import', payload);
 
 // Faculty submissions (admin side)
 export const listFacultySubmissions = (params) => apiClient.get('/faculty-questions', { params });
@@ -37,6 +47,8 @@ export const rejectFacultySubmission = (submissionId, notes) =>
 
 // Blueprints & papers
 export const createBlueprint = (payload) => apiClient.post('/blueprints', payload);
+export const getBlueprintByExam = (examId) => apiClient.get(`/blueprints/exam/${examId}`);
+export const updateBlueprint = (blueprintId, sections) => apiClient.put(`/blueprints/${blueprintId}`, { sections });
 export const generatePaper = (payload) => apiClient.post('/papers/generate', payload);
 export const editPaper = (paperId, changes) => apiClient.put(`/papers/${paperId}`, changes);
 export const previewPaper = (paperId) => apiClient.get(`/papers/${paperId}/preview`);
@@ -55,6 +67,8 @@ export const regenerateTranslation = (translationId, provider) =>
 // Academic structure
 export const listAcademic = (entity) => apiClient.get(`/academic/${entity}`);
 export const createAcademic = (entity, payload) => apiClient.post(`/academic/${entity}`, payload);
+export const updateAcademic = (entity, id, payload) => apiClient.put(`/academic/${entity}/${id}`, payload);
+export const deactivateAcademic = (entity, id) => apiClient.delete(`/academic/${entity}/${id}`);
 
 // Results (admin review workflow)
 export const listResultsForExam = (examId) => apiClient.get(`/exams/${examId}/results`);

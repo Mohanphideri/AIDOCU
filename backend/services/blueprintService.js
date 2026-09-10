@@ -46,9 +46,24 @@ async function createBlueprint({ examId, sections, adminId }) {
   return blueprint;
 }
 
+async function getBlueprintByExam(examId) {
+  const { ExamBlueprint } = require('../models');
+  return ExamBlueprint.findOne({ examId });
+}
+
 async function updateBlueprint(blueprintId, sections, adminId) {
   const blueprint = await ExamBlueprint.findById(blueprintId);
   if (!blueprint) throw new ApiError('Blueprint not found', 404, 'NOT_FOUND');
+
+  const { Paper } = require('../models');
+  const lockedPaper = await Paper.findOne({ blueprintId: blueprint._id, status: 'LOCKED' });
+  if (lockedPaper) {
+    throw new ApiError(
+      'This blueprint is locked to a generated, locked paper and can no longer be edited.',
+      409,
+      'BLUEPRINT_LOCKED'
+    );
+  }
 
   validateSections(sections);
 
@@ -69,4 +84,4 @@ async function updateBlueprint(blueprintId, sections, adminId) {
   return blueprint;
 }
 
-module.exports = { createBlueprint, updateBlueprint, validateSections };
+module.exports = { createBlueprint, updateBlueprint, getBlueprintByExam, validateSections };

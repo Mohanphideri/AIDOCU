@@ -233,6 +233,70 @@ async function importQuestions({ universityId, subjectId, items, format, adminId
   return { createdCount: created.length, createdIds: created, errors };
 }
 
+const IMPORT_REQUIRED_COLUMNS = ['questionText', 'optionA', 'optionB', 'optionC', 'optionD', 'correctAnswer', 'marks'];
+const VALID_ANSWER_KEYS = ['A', 'B', 'C', 'D'];
+
+/**
+ * Validates parsed CSV rows for the question-bank bulk import, mirroring
+ * eligibilityService.validateEligibilityCsv's preview/import two-step
+ * pattern: this is step one (preview) — nothing is written to the DB here.
+ * Each row of `rows` is a plain object keyed by CSV column header.
+ */
+async function validateImportCsv(rows) {
+  const valid = [];
+  const invalid = [];
+
+  rows.forEach((row, idx) => {
+    const rowNumber = idx + 2; // +2: header row + 1-index
+    const missing = IMPORT_REQUIRED_COLUMNS.filter((col) => !row[col] || !String(row[col]).trim());
+    if (missing.length) {
+      invalid.push({ rowNumber, reason: `Missing required column(s): ${missing.join(', ')}` });
+      return;
+    }
+
+    const correctAnswer = String(row.correctAnswer).trim().toUpperCase();
+    if (!VALID_ANSWER_KEYS.includes(correctAnswer)) {
+      invalid.push({ rowNumber, reason: 'correctAnswer must be one of A, B, C, D' });
+      return;
+    }
+
+    const marks = Number(row.marks);
+    if (Number.isNaN(marks) || marks < 0) {
+      invalid.push({ rowNumber, reason: 'marks must be a non-negative number' });
+      return;
+    }
+
+    valid.push({
+      rowNumber,
+      questionText: row.questionText.trim(),
+      options: {
+        A: row.optionA.trim(),
+        B: row.optionB.trim(),
+        C: row.optionC.trim(),
+        D: row.optionD.trim(),
+      },
+      correctAnswer,
+      marks,
+      difficulty: ['EASY', 'MEDIUM', 'HARD'].includes((row.difficulty || '').trim().toUpperCase())
+        ? row.difficulty.trim().toUpperCase()
+        : 'MEDIUM',
+      unit: row.unit?.trim() || null,
+      topic: row.topic?.trim() || null,
+      explanation: row.explanation?.trim() || '',
+      reference: row.reference?.trim() || '',
+      tags: row.tags ? row.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+    });
+  });
+
+  return {
+    totalRows: rows.length,
+    validCount: valid.length,
+    invalidCount: invalid.length,
+    valid,
+    invalid,
+  };
+}
+
 module.exports = {
   createQuestion,
   updateQuestion,
@@ -240,4 +304,5 @@ module.exports = {
   rejectQuestion,
   searchQuestions,
   importQuestions,
+  validateImportCsv,
 };

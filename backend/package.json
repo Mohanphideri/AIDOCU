@@ -26,7 +26,8 @@
     "socket.io": "^4.7.5",
     "sib-api-v3-sdk": "^8.5.0",
     "morgan": "^1.10.0",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.4",

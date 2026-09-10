@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-export default function StaffLoginPage({ title, loginFn, redirectTo }) {
+export default function StaffLoginPage({ title, loginFn, redirectTo, forgotPasswordPath }) {
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -25,6 +26,9 @@ export default function StaffLoginPage({ title, loginFn, redirectTo }) {
   return (
     <div className="page-container">
       <h1>{title}</h1>
+      {location.state?.justReset && (
+        <div className="success-banner">Your password has been reset. You may now log in.</div>
+      )}
       {error && <div className="error-text">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="form-field">
@@ -39,6 +43,11 @@ export default function StaffLoginPage({ title, loginFn, redirectTo }) {
           {submitting ? 'Signing in…' : 'Login'}
         </button>
       </form>
+      {forgotPasswordPath && (
+        <p>
+          <Link to={forgotPasswordPath}>Forgot password?</Link>
+        </p>
+      )}
     </div>
   );
 }

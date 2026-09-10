@@ -1,6 +1,8 @@
 const { Exam } = require('../models');
 const { ApiError } = require('../middleware/errorHandler');
 const auditService = require('./auditService');
+const emailService = require('./emailService');
+const { env } = require('../config/env');
 
 const EDITABLE_WHILE_LIVE_FIELDS = ['instructions', 'proctoringSettings', 'queryDeadlineHoursAfterExam'];
 
@@ -106,7 +108,44 @@ async function transitionStatus({ examId, targetStatus, adminId }) {
     afterValue: { status: targetStatus },
   });
 
+  // Eligible students are notified the instant (and only the instant) the
+  // exam goes ACTIVE — never at creation/scheduling. Email failures must
+  // never roll back the activation itself, so this runs after save/audit
+  // and never throws (sendExamActiveEmail logs failures via EmailLog).
+  if (targetStatus === 'ACTIVE') {
+    await notifyEligibleStudentsExamActive(exam);
+  }
+
   return exam;
+}
+
+async function notifyEligibleStudentsExamActive(exam) {
+  const { ExamEligibility, Student, University, Subject } = require('../models');
+
+  const [university, subject, eligibilities] = await Promise.all([
+    University.findById(exam.universityId),
+    Subject.findById(exam.subjectId),
+    ExamEligibility.find({ examId: exam._id }).populate('studentId', 'name universityEmail'),
+  ]);
+
+  const universityName = university?.name || 'University';
+  const examName = subject ? `${exam.subjectCode} — ${subject.name}` : `${exam.subjectCode} (${exam.examType})`;
+
+  for (const eligibility of eligibilities) {
+    const student = eligibility.studentId;
+    if (!student || !student.universityEmail) continue;
+    await emailService.sendExamActiveEmail({
+      to: student.universityEmail,
+      studentId: student._id,
+      examId: exam._id,
+      examName,
+      universityName,
+      startTime: exam.startTime,
+      endTime: exam.endTime,
+      durationMinutes: exam.durationMinutes,
+      examPortalUrl: `${env.CLIENT_URL}/exam/${exam._id}/security`,
+    });
+  }
 }
 
 async function listExams(filters = {}, pagination = {}) {

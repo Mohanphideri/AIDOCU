@@ -8,6 +8,7 @@ const {
   ResultRevision,
   Exam,
   Student,
+  University,
 } = require('../models');
 const { ApiError } = require('../middleware/errorHandler');
 const auditService = require('./auditService');
@@ -186,6 +187,7 @@ async function publishResults({ examId, adminId, resultPortalBaseUrl }) {
 
   // Email failures must never roll back publication — sendResultPublicationEmail
   // handles its own failure logging via EmailLog and never throws.
+  const university = await University.findById(exam.universityId);
   for (const result of publishedResults) {
     const student = await Student.findById(result.studentId);
     if (!student) continue;
@@ -195,7 +197,7 @@ async function publishResults({ examId, adminId, resultPortalBaseUrl }) {
       examId: exam._id,
       resultId: result._id,
       examName: `${exam.examType} - ${exam.subjectCode}`,
-      universityName: 'University', // TODO: populate from University doc
+      universityName: university?.name || 'University',
       resultPortalUrl: `${resultPortalBaseUrl}/results/${result._id}`,
     });
   }
@@ -225,6 +227,18 @@ async function getResultForStudent({ resultId, studentId }) {
   return result;
 }
 
+/**
+ * Every PUBLISHED result belonging to the student, for the dashboard's
+ * "Results" section. Unpublished (DRAFT/UNDER_REVIEW/FINALIZED) results are
+ * never surfaced to the student — only an explicit publish action makes a
+ * result visible here.
+ */
+async function listResultsForStudent(studentId) {
+  return Result.find({ studentId, status: 'PUBLISHED' })
+    .populate('examId', 'subjectCode examType examDate maximumMarks')
+    .sort({ publishedAt: -1 });
+}
+
 module.exports = {
   calculateResult,
   correctResult,
@@ -232,4 +246,5 @@ module.exports = {
   publishResults,
   getResultForStudent,
   listResultsForExam,
+  listResultsForStudent,
 };

@@ -19,4 +19,13 @@ async function update(req, res, next) {
   }
 }
 
-module.exports = { create, update };
+async function getByExam(req, res, next) {
+  try {
+    const blueprint = await blueprintService.getBlueprintByExam(req.params.examId);
+    return success(res, blueprint); // null when the exam has no blueprint yet
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { create, update, getByExam };
